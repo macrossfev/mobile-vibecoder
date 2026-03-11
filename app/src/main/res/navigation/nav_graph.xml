@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/navigation_servers">
+
+    <fragment
+        android:id="@+id/navigation_servers"
+        android:name="com.vibecoder.ui.ServerListFragment"
+        android:label="@string/servers"
+        tools:layout="@layout/fragment_server_list">
+        <action
+            android:id="@+id/action_serverList_to_terminal"
+            app:destination="@id/terminalFragment" />
+        <action
+            android:id="@+id/action_serverList_to_monitor"
+            app:destination="@id/monitorFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_monitor"
+        android:name="com.vibecoder.ui.MonitorFragment"
+        android:label="@string/monitor"
+        tools:layout="@layout/fragment_monitor">
+        <argument
+            android:name="server"
+            app:argType="com.vibecoder.data.ServerConfig" />
+        <action
+            android:id="@+id/action_monitor_to_terminal"
+            app:destination="@id/terminalFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_settings"
+        android:name="com.vibecoder.ui.SettingsFragment"
+        android:label="@string/settings"
+        tools:layout="@layout/fragment_settings" />
+
+    <fragment
+        android:id="@+id/terminalFragment"
+        android:name="com.vibecoder.ui.TerminalFragment"
+        android:label="@string/terminal"
+        tools:layout="@layout/fragment_terminal">
+        <argument
+            android:name="server"
+            app:argType="com.vibecoder.data.ServerConfig" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/monitorFragment"
+        android:name="com.vibecoder.ui.MonitorFragment"
+        android:label="@string/monitor"
+        tools:layout="@layout/fragment_monitor">
+        <argument
+            android:name="server"
+            app:argType="com.vibecoder.data.ServerConfig" />
+    </fragment>
+
+</navigation>

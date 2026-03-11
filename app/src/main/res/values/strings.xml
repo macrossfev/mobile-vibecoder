@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MobileVibeCoder</string>
+    <string name="servers">服务器</string>
+    <string name="monitor">监控</string>
+    <string name="settings">设置</string>
+    <string name="add_server">添加服务器</string>
+    <string name="server_name">服务器名称</string>
+    <string name="host">主机地址</string>
+    <string name="port">端口</string>
+    <string name="username">用户名</string>
+    <string name="password">密码</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="connect">连接</string>
+    <string name="disconnect">断开连接</string>
+    <string name="voice_input">语音输入</string>
+    <string name="terminal">终端</string>
+    <string name="clear">清屏</string>
+    <string name="send">发送</string>
+    <string name="refresh">刷新</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    <string name="confirm">确认</string>
+    <string name="no_servers">暂无服务器</string>
+    <string name="add_server_hint">点击右下角按钮添加服务器</string>
+    <string name="connecting">正在连接...</string>
+    <string name="connected">已连接</string>
+    <string name="disconnected">未连接</string>
+    <string name="connection_failed">连接失败</string>
+    <string name="listening">正在监听...</string>
+    <string name="speak_now">请说话...</string>
+    <string name="recognizing">识别中...</string>
+    <string name="understanding">正在理解...</string>
+    <string name="command_preview">命令预览</string>
+    <string name="execute">执行</string>
+    <string name="dangerous_command">警告: 此命令可能有风险</string>
+</resources>
