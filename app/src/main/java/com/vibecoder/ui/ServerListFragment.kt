@@ -84,6 +84,12 @@ class ServerListFragment : Fragment() {
             }
         }
 
+        // Tmux 开关切换
+        dialogBinding.switchUseTmux.setOnCheckedChangeListener { _, isChecked ->
+            dialogBinding.tilTmuxSession.visibility = if (isChecked) View.VISIBLE else View.GONE
+            dialogBinding.tvTmuxHint.visibility = if (isChecked) View.VISIBLE else View.GONE
+        }
+
         // 生成密钥按钮
         dialogBinding.btnGenerateKey.setOnClickListener {
             showKeyGenerationDialog(dialogBinding)
@@ -122,6 +128,8 @@ class ServerListFragment : Fragment() {
             .setView(dialogBinding.root)
             .setPositiveButton("保存") { _, _ ->
                 val isKeyAuth = dialogBinding.rbKey.isChecked
+                val useTmux = dialogBinding.switchUseTmux.isChecked
+                val tmuxSession = dialogBinding.etTmuxSession.text.toString().ifBlank { "main" }
                 val server = ServerConfig(
                     name = dialogBinding.etName.text.toString(),
                     host = dialogBinding.etHost.text.toString(),
@@ -129,7 +137,9 @@ class ServerListFragment : Fragment() {
                     username = dialogBinding.etUsername.text.toString(),
                     password = if (isKeyAuth) null else dialogBinding.etPassword.text.toString().ifBlank { null },
                     privateKey = if (isKeyAuth) dialogBinding.etPrivateKey.text.toString().ifBlank { null } else null,
-                    passphrase = if (isKeyAuth) dialogBinding.etPassphrase.text.toString().ifBlank { null } else null
+                    passphrase = if (isKeyAuth) dialogBinding.etPassphrase.text.toString().ifBlank { null } else null,
+                    useTmux = useTmux,
+                    tmuxSession = tmuxSession
                 )
                 prefsManager.addServer(server)
                 loadServers()
@@ -210,6 +220,12 @@ class ServerListFragment : Fragment() {
                 etPassword.setText(server.password)
             }
 
+            // Tmux 设置
+            switchUseTmux.isChecked = server.useTmux
+            etTmuxSession.setText(server.tmuxSession)
+            tilTmuxSession.visibility = if (server.useTmux) View.VISIBLE else View.GONE
+            tvTmuxHint.visibility = if (server.useTmux) View.VISIBLE else View.GONE
+
             // 设置认证方式切换
             rgAuthType.setOnCheckedChangeListener { _, checkedId ->
                 when (checkedId) {
@@ -223,6 +239,12 @@ class ServerListFragment : Fragment() {
                     }
                 }
             }
+
+            // Tmux 开关切换
+            switchUseTmux.setOnCheckedChangeListener { _, isChecked ->
+                tilTmuxSession.visibility = if (isChecked) View.VISIBLE else View.GONE
+                tvTmuxHint.visibility = if (isChecked) View.VISIBLE else View.GONE
+            }
         }
 
         MaterialAlertDialogBuilder(requireContext())
@@ -230,6 +252,8 @@ class ServerListFragment : Fragment() {
             .setView(dialogBinding.root)
             .setPositiveButton("保存") { _, _ ->
                 val isKeyAuth = dialogBinding.rbKey.isChecked
+                val useTmux = dialogBinding.switchUseTmux.isChecked
+                val tmuxSession = dialogBinding.etTmuxSession.text.toString().ifBlank { "main" }
                 val updated = server.copy(
                     name = dialogBinding.etName.text.toString(),
                     host = dialogBinding.etHost.text.toString(),
@@ -237,7 +261,9 @@ class ServerListFragment : Fragment() {
                     username = dialogBinding.etUsername.text.toString(),
                     password = if (isKeyAuth) null else dialogBinding.etPassword.text.toString().ifBlank { null },
                     privateKey = if (isKeyAuth) dialogBinding.etPrivateKey.text.toString().ifBlank { null } else null,
-                    passphrase = if (isKeyAuth) dialogBinding.etPassphrase.text.toString().ifBlank { null } else null
+                    passphrase = if (isKeyAuth) dialogBinding.etPassphrase.text.toString().ifBlank { null } else null,
+                    useTmux = useTmux,
+                    tmuxSession = tmuxSession
                 )
                 prefsManager.updateServer(updated)
                 loadServers()

@@ -353,7 +353,16 @@ class TerminalFragment : Fragment() {
                 )
 
                 result.fold(
-                    onSuccess = { },
+                    onSuccess = {
+                        // Shell 就绪后，检查是否启用 tmux
+                        server?.let { srv ->
+                            if (srv.useTmux) {
+                                // 延迟发送 tmux 命令，等待 shell 完全就绪
+                                Thread.sleep(500)
+                                attachTmuxSession(srv.tmuxSession)
+                            }
+                        }
+                    },
                     onFailure = { error ->
                         if (isAdded && activity != null) {
                             activity?.runOnUiThread {
@@ -365,6 +374,15 @@ class TerminalFragment : Fragment() {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun attachTmuxSession(sessionName: String) {
+        // tmux attach -t session || tmux new -s session
+        val safeSession = sessionName.replace(" ", "_").replace("\"", "\\\"")
+        val tmuxCommand = "tmux attach -t \"$safeSession\" 2>/dev/null || tmux new -s \"$safeSession\"\n"
+        lifecycleScope.launch {
+            sshManager.writeToShellAsync(tmuxCommand)
         }
     }
 

@@ -16,7 +16,10 @@ data class ServerConfig(
     val passphrase: String? = null,
     val lastConnected: Long = 0,
     val isFavorite: Boolean = false,
-    val color: String = "#4CAF50"
+    val color: String = "#4CAF50",
+    // Tmux 设置
+    val useTmux: Boolean = false,
+    val tmuxSession: String = "main"
 ) : Serializable {
 
     fun getDisplayAddress(): String {
