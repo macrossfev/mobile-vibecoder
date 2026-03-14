@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #terminal {
+            width: 100%;
+            height: 100%;
+        }
+        /* 隐藏 xterm 滚动条 */
+        .xterm-viewport::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+</head>
+<body>
+    <div id="terminal"></div>
+    <script>
+        const term = new Terminal({
+            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+            fontSize: 12,  // 手机用较小字体
+            lineHeight: 1.2,  // 紧凑行距
+            letterSpacing: 0,
+            theme: {
+                background: '#000000',
+                foreground: '#cccccc',
+                cursor: '#ffffff',
+                cursorAccent: '#000000',
+                selection: 'rgba(255, 255, 255, 0.3)',
+                black: '#000000',
+                red: '#e06c75',
+                green: '#98c379',
+                yellow: '#d19a66',
+                blue: '#61afef',
+                magenta: '#c678dd',
+                cyan: '#56b6c2',
+                white: '#abb2bf'
+            },
+            cursorBlink: true,
+            cursorStyle: 'block',
+            scrollback: 3000,
+            convertEol: true  // 将 \n 转换为 \r\n
+        });
+
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+
+        // 通知 Android 终端尺寸
+        function notifySize() {
+            if (window.AndroidTerminal) {
+                window.AndroidTerminal.onReady(term.cols, term.rows);
+            }
+        }
+
+        // 初始通知
+        setTimeout(notifySize, 100);
+
+        // 窗口大小改变时重新调整
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+            if (window.AndroidTerminal) {
+                window.AndroidTerminal.onResize(term.cols, term.rows);
+            }
+        });
+
+        // Base64 解码并写入
+        window.writeToTerminalBase64 = function(base64Data) {
+            try {
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const text = new TextDecoder('utf-8').decode(bytes);
+                term.write(text);
+            } catch (e) {
+                console.error('Terminal write error:', e);
+            }
+        };
+
+        window.clearTerminal = function() {
+            term.clear();
+        };
+
+        // 获取终端尺寸
+        window.getTerminalSize = function() {
+            return JSON.stringify({ cols: term.cols, rows: term.rows });
+        };
+    </script>
+</body>
+</html>

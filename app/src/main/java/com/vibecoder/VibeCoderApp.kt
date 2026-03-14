@@ -4,8 +4,9 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import androidx.multidex.MultiDexApplication
 
-class VibeCoderApp : Application() {
+class VibeCoderApp : MultiDexApplication() {
 
     override fun onCreate() {
         super.onCreate()

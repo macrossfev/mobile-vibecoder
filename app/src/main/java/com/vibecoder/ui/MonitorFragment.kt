@@ -6,7 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.navArgs
+import com.google.gson.Gson
 import com.vibecoder.data.ServerConfig
 import com.vibecoder.databinding.FragmentMonitorBinding
 import com.vibecoder.ssh.SSHManager
@@ -18,30 +18,29 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * 服务器监控Fragment
- */
 class MonitorFragment : Fragment() {
 
     private var _binding: FragmentMonitorBinding? = null
     private val binding get() = _binding!!
 
-    private val args: MonitorFragmentArgs by navArgs()
-    private lateinit var server: ServerConfig
-
+    private var server: ServerConfig? = null
     private val sshManager = SSHManager()
     private var monitorJob: Job? = null
 
-    // 历史数据用于图表
     private val cpuHistory = mutableListOf<Float>()
     private val memoryHistory = mutableListOf<Float>()
     private val maxHistorySize = 60
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup,
-        savedInstanceState: Bundle?
-    ): View {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // 使用Gson解析JSON字符串
+        val serverJson = arguments?.getString(ARG_SERVER_JSON)
+        if (!serverJson.isNullOrBlank()) {
+            server = Gson().fromJson(serverJson, ServerConfig::class.java)
+        }
+    }
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentMonitorBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -49,56 +48,45 @@ class MonitorFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        server = args.server
-        binding.tvServerName.text = server.name
-        binding.tvServerAddress.text = server.getDisplayAddress()
+        val currentServer = server
+        if (currentServer == null) {
+            updateConnectionStatus("服务器配置无效")
+            return
+        }
+
+        binding.tvServerName.text = currentServer.name
+        binding.tvServerAddress.text = currentServer.getDisplayAddress()
 
         setupQuickCommands()
-        connectAndMonitor()
+        connectAndMonitor(currentServer)
     }
 
     private fun setupQuickCommands() {
-        binding.btnRefresh.setOnClickListener {
-            fetchStatus()
-        }
+        binding.btnRefresh.setOnClickListener { lifecycleScope.launch { fetchStatus() } }
+        binding.btnTerminal.setOnClickListener { openTerminal() }
 
-        binding.btnTerminal.setOnClickListener {
-            // 导航到终端
-            val action = MonitorFragmentDirections.actionMonitorToTerminal(server)
-            // findNavController().navigate(action)
-        }
-
-        // 快捷命令按钮
-        binding.btnCpuInfo.setOnClickListener {
-            executeQuickCommand("ps aux --sort=-%cpu | head -10")
-        }
-
-        binding.btnMemInfo.setOnClickListener {
-            executeQuickCommand("ps aux --sort=-%mem | head -10")
-        }
-
-        binding.btnDiskInfo.setOnClickListener {
-            executeQuickCommand("df -h")
-        }
-
-        binding.btnNetworkInfo.setOnClickListener {
-            executeQuickCommand("netstat -tuln")
-        }
-
-        binding.btnProcesses.setOnClickListener {
-            executeQuickCommand("ps aux | head -20")
-        }
-
-        binding.btnUptime.setOnClickListener {
-            executeQuickCommand("uptime")
-        }
+        binding.btnCpuInfo.setOnClickListener { executeQuickCommand("ps aux --sort=-%cpu | head -10") }
+        binding.btnMemInfo.setOnClickListener { executeQuickCommand("ps aux --sort=-%mem | head -10") }
+        binding.btnDiskInfo.setOnClickListener { executeQuickCommand("df -h") }
+        binding.btnNetworkInfo.setOnClickListener { executeQuickCommand("netstat -tuln") }
+        binding.btnProcesses.setOnClickListener { executeQuickCommand("ps aux | head -20") }
+        binding.btnUptime.setOnClickListener { executeQuickCommand("uptime") }
     }
 
-    private fun connectAndMonitor() {
+    private fun openTerminal() {
+        val currentServer = server ?: return
+        val fragment = TerminalFragment.newInstance(currentServer)
+        parentFragmentManager.beginTransaction()
+            .replace(com.vibecoder.R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
+    }
+
+    private fun connectAndMonitor(serverConfig: ServerConfig) {
         lifecycleScope.launch {
             updateConnectionStatus("正在连接...")
 
-            val result = sshManager.connect(server)
+            val result = sshManager.connect(serverConfig)
 
             result.fold(
                 onSuccess = {
@@ -116,7 +104,7 @@ class MonitorFragment : Fragment() {
         monitorJob = lifecycleScope.launch {
             while (true) {
                 fetchStatus()
-                delay(5000) // 每5秒刷新
+                delay(5000)
             }
         }
     }
@@ -125,11 +113,9 @@ class MonitorFragment : Fragment() {
         val result = sshManager.fetchServerStatus()
 
         result.fold(
-            onSuccess = { status ->
-                updateUI(status)
-            },
+            onSuccess = { status -> updateUI(status) },
             onFailure = { error ->
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     updateConnectionStatus("获取状态失败: ${error.message}")
                 }
             }
@@ -137,63 +123,45 @@ class MonitorFragment : Fragment() {
     }
 
     private fun updateUI(status: ServerStatusInfo) {
-        requireActivity().runOnUiThread {
-            // 更新时间
-            binding.tvLastUpdate.text = "更新时间: ${
-                SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-            }"
+        activity?.runOnUiThread {
+            if (_binding == null) return@runOnUiThread
+            binding.tvLastUpdate.text = "更新时间: ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())}"
 
-            // CPU
             binding.progressCpu.progress = status.cpuUsage.toInt()
             binding.tvCpuUsage.text = "CPU: %.1f%%".format(status.cpuUsage)
             updateCpuHistory(status.cpuUsage)
 
-            // 内存
             val memPercent = status.memoryPercent
             binding.progressMemory.progress = memPercent.toInt()
-            binding.tvMemoryUsage.text = "内存: %.1f%% (%d/%d MB)".format(
-                memPercent, status.memoryUsedMB, status.memoryTotalMB
-            )
+            binding.tvMemoryUsage.text = "内存: %.1f%% (%d/%d MB)".format(memPercent, status.memoryUsedMB, status.memoryTotalMB)
             updateMemoryHistory(memPercent)
 
-            // 磁盘
             binding.progressDisk.progress = status.diskPercent.toInt()
-            binding.tvDiskUsage.text = "磁盘: %.1f%% (%.1f/%.1f GB)".format(
-                status.diskPercent, status.diskUsedGB, status.diskTotalGB
-            )
+            binding.tvDiskUsage.text = "磁盘: %.1f%% (%.1f/%.1f GB)".format(status.diskPercent, status.diskUsedGB, status.diskTotalGB)
 
-            // 运行时间和负载
             binding.tvUptime.text = "运行时间: ${status.uptime}"
             binding.tvLoadAverage.text = "负载: ${status.loadAverage}"
 
-            // 健康状态
-            val isHealthy = status.isHealthy
+            val isHealthy = status.cpuUsage < 90 && memPercent < 90 && status.diskPercent < 90
             binding.tvHealthStatus.text = if (isHealthy) "健康" else "警告"
-            binding.tvHealthStatus.setTextColor(
-                if (isHealthy) 0xFF4CAF50.toInt() else 0xFFFF5722.toInt()
-            )
+            binding.tvHealthStatus.setTextColor(if (isHealthy) 0xFF4CAF50.toInt() else 0xFFFF5722.toInt())
 
-            // 更新历史图表
             updateChart()
         }
     }
 
     private fun updateCpuHistory(value: Float) {
         cpuHistory.add(value)
-        if (cpuHistory.size > maxHistorySize) {
-            cpuHistory.removeAt(0)
-        }
+        if (cpuHistory.size > maxHistorySize) cpuHistory.removeAt(0)
     }
 
     private fun updateMemoryHistory(value: Float) {
         memoryHistory.add(value)
-        if (memoryHistory.size > maxHistorySize) {
-            memoryHistory.removeAt(0)
-        }
+        if (memoryHistory.size > maxHistorySize) memoryHistory.removeAt(0)
     }
 
     private fun updateChart() {
-        // 简单的文本图表展示
+        if (_binding == null) return
         val chartBuilder = StringBuilder()
 
         if (cpuHistory.isNotEmpty()) {
@@ -218,8 +186,10 @@ class MonitorFragment : Fragment() {
     }
 
     private fun updateConnectionStatus(status: String) {
-        requireActivity().runOnUiThread {
-            binding.tvConnectionStatus.text = status
+        activity?.runOnUiThread {
+            if (_binding != null) {
+                binding.tvConnectionStatus.text = status
+            }
         }
     }
 
@@ -228,19 +198,17 @@ class MonitorFragment : Fragment() {
             val result = sshManager.executeCommand(command)
 
             result.fold(
-                onSuccess = { output ->
-                    showCommandOutput(command, output)
-                },
-                onFailure = { error ->
-                    showCommandOutput(command, "错误: ${error.message}")
-                }
+                onSuccess = { output -> showCommandOutput(command, output) },
+                onFailure = { error -> showCommandOutput(command, "错误: ${error.message}") }
             )
         }
     }
 
     private fun showCommandOutput(command: String, output: String) {
-        requireActivity().runOnUiThread {
-            binding.tvCommandOutput.text = "$ $command\n$output"
+        activity?.runOnUiThread {
+            if (_binding != null) {
+                binding.tvCommandOutput.text = "$ $command\n$output"
+            }
         }
     }
 
@@ -249,5 +217,15 @@ class MonitorFragment : Fragment() {
         monitorJob?.cancel()
         sshManager.disconnect()
         _binding = null
+    }
+
+    companion object {
+        private const val ARG_SERVER_JSON = "server_json"
+
+        fun newInstance(server: ServerConfig) = MonitorFragment().apply {
+            arguments = Bundle().apply {
+                putString(ARG_SERVER_JSON, Gson().toJson(server))
+            }
+        }
     }
 }

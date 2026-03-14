@@ -9,9 +9,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.vibecoder.data.ServerConfig
 import com.vibecoder.databinding.ItemServerBinding
 
-/**
- * 服务器列表适配器
- */
 class ServerAdapter(
     private val onServerClick: (ServerConfig) -> Unit,
     private val onServerLongClick: (ServerConfig) -> Unit,
@@ -19,11 +16,7 @@ class ServerAdapter(
 ) : ListAdapter<ServerConfig, ServerAdapter.ViewHolder>(ServerDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemServerBinding.inflate(
-            LayoutInflater.from(parent.context),
-            parent,
-            false
-        )
+        val binding = ItemServerBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return ViewHolder(binding)
     }
 
@@ -31,31 +24,23 @@ class ServerAdapter(
         holder.bind(getItem(position))
     }
 
-    inner class ViewHolder(
-        private val binding: ItemServerBinding
-    ) : RecyclerView.ViewHolder(binding.root) {
+    inner class ViewHolder(private val binding: ItemServerBinding) : RecyclerView.ViewHolder(binding.root) {
 
         init {
             binding.root.setOnClickListener {
-                val position = bindingAdapterPosition
-                if (position != RecyclerView.NO_POSITION) {
-                    onServerClick(getItem(position))
-                }
+                val pos = adapterPosition
+                if (pos != RecyclerView.NO_POSITION) onServerClick(getItem(pos))
             }
 
             binding.root.setOnLongClickListener {
-                val position = bindingAdapterPosition
-                if (position != RecyclerView.NO_POSITION) {
-                    onServerLongClick(getItem(position))
-                }
+                val pos = adapterPosition
+                if (pos != RecyclerView.NO_POSITION) onServerLongClick(getItem(pos))
                 true
             }
 
             binding.btnMonitor.setOnClickListener {
-                val position = bindingAdapterPosition
-                if (position != RecyclerView.NO_POSITION) {
-                    onMonitorClick(getItem(position))
-                }
+                val pos = adapterPosition
+                if (pos != RecyclerView.NO_POSITION) onMonitorClick(getItem(pos))
             }
         }
 
@@ -65,19 +50,15 @@ class ServerAdapter(
                 tvServerAddress.text = server.getDisplayAddress()
                 tvServerUser.text = server.username
 
-                // 设置颜色标记
                 try {
                     viewColorIndicator.setBackgroundColor(Color.parseColor(server.color))
                 } catch (e: Exception) {
                     viewColorIndicator.setBackgroundColor(Color.parseColor("#4CAF50"))
                 }
 
-                // 显示最后连接时间
                 if (server.lastConnected > 0) {
-                    val lastTime = java.text.SimpleDateFormat(
-                        "MM-dd HH:mm",
-                        java.util.Locale.getDefault()
-                    ).format(java.util.Date(server.lastConnected))
+                    val lastTime = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
+                        .format(java.util.Date(server.lastConnected))
                     tvLastConnected.text = "上次连接: $lastTime"
                     tvLastConnected.visibility = android.view.View.VISIBLE
                 } else {
@@ -88,12 +69,7 @@ class ServerAdapter(
     }
 
     class ServerDiffCallback : DiffUtil.ItemCallback<ServerConfig>() {
-        override fun areItemsTheSame(oldItem: ServerConfig, newItem: ServerConfig): Boolean {
-            return oldItem.id == newItem.id
-        }
-
-        override fun areContentsTheSame(oldItem: ServerConfig, newItem: ServerConfig): Boolean {
-            return oldItem == newItem
-        }
+        override fun areItemsTheSame(oldItem: ServerConfig, newItem: ServerConfig): Boolean = oldItem.id == newItem.id
+        override fun areContentsTheSame(oldItem: ServerConfig, newItem: ServerConfig): Boolean = oldItem == newItem
     }
 }

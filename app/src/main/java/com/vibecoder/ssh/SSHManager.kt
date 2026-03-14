@@ -1,173 +1,234 @@
 package com.vibecoder.ssh
 
-import com.jcraft.jsch.*
+import android.util.Log
+import com.jcraft.jsch.ChannelExec
+import com.jcraft.jsch.ChannelShell
+import com.jcraft.jsch.JSch
+import com.jcraft.jsch.Session
 import com.vibecoder.data.ServerConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
-import java.util.Properties
+import java.nio.charset.StandardCharsets
 
-/**
- * SSH连接状态
- */
-sealed class ConnectionState {
-    object Disconnected : ConnectionState()
-    object Connecting : ConnectionState()
-    data class Connected(val session: Session) : ConnectionState()
-    data class Error(val message: String) : ConnectionState()
-}
-
-/**
- * SSH会话管理器
- */
 class SSHManager {
 
     private var session: Session? = null
-    private var channel: ChannelShell? = null
+    private var shellChannel: ChannelShell? = null
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
 
-    private val jsch = JSch()
+    companion object {
+        private const val TAG = "SSHManager"
+    }
 
     /**
      * 建立SSH连接
      */
     suspend fun connect(config: ServerConfig): Result<Session> = withContext(Dispatchers.IO) {
         try {
-            // 如果已连接，先断开
             disconnect()
 
-            val newSession = jsch.getSession(config.username, config.host, config.port).apply {
-                // 设置认证方式
-                when {
-                    config.privateKey != null -> {
-                        if (config.passphrase != null) {
-                            jsch.addIdentity("key", config.privateKey.toByteArray(), null, config.passphrase.toByteArray())
-                        } else {
-                            jsch.addIdentity("key", config.privateKey.toByteArray(), null, null)
-                        }
-                    }
-                    config.password != null -> {
-                        setPassword(config.password)
-                    }
+            val jsch = JSch()
+
+            // 设置密钥认证
+            if (!config.privateKey.isNullOrBlank()) {
+                if (!config.passphrase.isNullOrBlank()) {
+                    jsch.addIdentity("key", config.privateKey.toByteArray(), null, config.passphrase.toByteArray())
+                } else {
+                    jsch.addIdentity("key", config.privateKey.toByteArray(), null, null)
                 }
-
-                // 连接配置
-                Properties().apply {
-                    put("StrictHostKeyChecking", "no")
-                    put("UserKnownHostsFile", "/dev/null")
-                }.let { setConfig(it) }
-
-                timeout = 30000
-                connect()
             }
 
-            session = newSession
-            Result.success(newSession)
-        } catch (e: JSchException) {
-            Result.failure(Exception("SSH连接失败: ${e.message}"))
+            session = jsch.getSession(config.username, config.host, config.port).apply {
+                if (!config.password.isNullOrBlank()) {
+                    setPassword(config.password)
+                }
+
+                setConfig("StrictHostKeyChecking", "no")
+                setConfig("UserKnownHostsFile", "no")
+                setConfig("KeepAlive", "yes")
+                setConfig("ServerAliveInterval", "30")
+                setConfig("ServerAliveCountMax", "3")
+
+                timeout = 30000
+            }
+
+            session?.connect(30000)
+
+            val currentSession = session ?: throw Exception("无法创建会话")
+            Result.success(currentSession)
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "连接失败", e)
+            val message = when {
+                e.message?.contains("Auth", ignoreCase = true) == true -> "认证失败: 请检查用户名、密码或密钥"
+                e.message?.contains("Connection refused", ignoreCase = true) == true -> "连接被拒绝: 请检查主机和端口"
+                e.message?.contains("timeout", ignoreCase = true) == true -> "连接超时: 请检查网络"
+                else -> "SSH连接失败: ${e.message}"
+            }
+            Result.failure(Exception(message))
         }
     }
 
     /**
-     * 执行单条命令并返回结果
+     * 执行单条命令
      */
     suspend fun executeCommand(command: String): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val currentSession = session ?: return@withContext Result.failure(
-                Exception("未连接到服务器")
-            )
+            val currentSession = session ?: return@withContext Result.failure(Exception("未连接到服务器"))
 
             val channel = currentSession.openChannel("exec") as ChannelExec
             channel.setCommand(command)
-            channel.connect()
 
-            val output = channel.inputStream.bufferedReader().readText()
-            val error = channel.errStream.bufferedReader().readText()
+            val output = ByteArrayOutputStream()
+            val error = ByteArrayOutputStream()
+
+            channel.outputStream = output
+            channel.setExtOutputStream(error)
+
+            channel.connect(30000)
+
+            while (!channel.isClosed) {
+                Thread.sleep(100)
+            }
 
             channel.disconnect()
 
-            Result.success(output + error)
+            val result = output.toString(StandardCharsets.UTF_8.name()) + error.toString(StandardCharsets.UTF_8.name())
+            Result.success(result)
         } catch (e: Exception) {
+            Log.e(TAG, "执行命令失败", e)
             Result.failure(e)
         }
     }
 
     /**
      * 打开交互式Shell
+     * @param cols 终端列数
+     * @param rows 终端行数
      */
     suspend fun openShell(
         onOutput: (String) -> Unit,
-        onConnected: () -> Unit
+        onConnected: () -> Unit,
+        cols: Int = 80,
+        rows: Int = 24
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val currentSession = session ?: return@withContext Result.failure(
-                Exception("未连接到服务器")
-            )
+            val currentSession = session ?: return@withContext Result.failure(Exception("未连接到服务器"))
 
-            channel = (currentSession.openChannel("shell") as ChannelShell).apply {
-                setPty(true)
-                setPtyType("xterm-256color", 80, 24, 800, 600)
-                connect()
+            if (!currentSession.isConnected) {
+                return@withContext Result.failure(Exception("Session未连接"))
             }
 
-            inputStream = channel!!.inputStream
-            outputStream = channel!!.outputStream
+            val channel = currentSession.openChannel("shell") as ChannelShell
+            channel.setPty(true)
+            // 使用传入的终端尺寸，像素宽高根据列数和行数计算（假设字体 8x16）
+            val pixelWidth = cols * 8
+            val pixelHeight = rows * 16
+            channel.setPtyType("xterm", cols, rows, pixelWidth, pixelHeight)
+            channel.setEnv("TERM", "xterm-256color")
+            channel.setEnv("LANG", "en_US.UTF-8")
 
-            onConnected()
+            val os = channel.outputStream
+            val inputStr = channel.inputStream
 
-            // 读取输出
-            val buffer = ByteArray(4096)
-            while (channel?.isConnected == true) {
-                val read = inputStream?.read(buffer) ?: -1
-                if (read > 0) {
-                    val output = String(buffer, 0, read, Charsets.UTF_8)
-                    onOutput(output)
+            channel.connect(30000)
+
+            if (!channel.isConnected) {
+                return@withContext Result.failure(Exception("Shell连接失败"))
+            }
+
+            shellChannel = channel
+            outputStream = os
+            inputStream = inputStr
+
+            withContext(Dispatchers.Main) { onConnected() }
+
+            val buffer = ByteArray(8192)
+            while (currentSession.isConnected && channel.isConnected) {
+                try {
+                    val available = inputStr.available()
+                    if (available > 0) {
+                        val read = inputStr.read(buffer, 0, minOf(available, buffer.size))
+                        if (read > 0) {
+                            val output = String(buffer, 0, read, StandardCharsets.UTF_8)
+                            // 调试：打印 SSH 原始输出
+                            val debugOutput = output
+                                .replace("\u001B", "\\e")
+                                .replace("\r", "\\r")
+                                .replace("\n", "\\n")
+                            Log.d(TAG, "SSH output ($read bytes): $debugOutput")
+                            onOutput(output)
+                        }
+                    } else {
+                        Thread.sleep(50)
+                    }
+                } catch (e: Exception) {
+                    break
                 }
             }
 
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e(TAG, "Shell错误", e)
             Result.failure(e)
         }
     }
 
     /**
-     * 向Shell发送命令
+     * 向Shell发送命令（在IO线程执行）
      */
-    fun writeToShell(command: String) {
+    suspend fun writeToShellAsync(command: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            outputStream?.write("$command\n".toByteArray(Charsets.UTF_8))
-            outputStream?.flush()
+            val os = outputStream ?: return@withContext false
+            os.write(command.toByteArray(StandardCharsets.UTF_8))
+            os.flush()
+            true
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "发送命令失败", e)
+            false
+        }
+    }
+
+    /**
+     * 发送回车键（在IO线程执行）
+     */
+    suspend fun sendEnterAsync(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val os = outputStream ?: return@withContext false
+            // 发送 \r\n 组合，兼容各种终端和交互式程序
+            os.write("\r\n".toByteArray(StandardCharsets.UTF_8))
+            os.flush()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "发送回车失败", e)
+            false
         }
     }
 
     /**
      * 发送Ctrl+C
      */
-    fun sendCtrlC() {
+    suspend fun sendCtrlC() = withContext(Dispatchers.IO) {
         try {
             outputStream?.write(byteArrayOf(3))
             outputStream?.flush()
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "发送Ctrl+C失败", e)
         }
     }
 
     /**
      * 发送Ctrl+D
      */
-    fun sendCtrlD() {
+    suspend fun sendCtrlD() = withContext(Dispatchers.IO) {
         try {
             outputStream?.write(byteArrayOf(4))
             outputStream?.flush()
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "发送Ctrl+D失败", e)
         }
     }
 
@@ -176,12 +237,12 @@ class SSHManager {
      */
     fun disconnect() {
         try {
-            channel?.disconnect()
+            shellChannel?.disconnect()
             session?.disconnect()
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "断开连接失败", e)
         } finally {
-            channel = null
+            shellChannel = null
             session = null
             inputStream = null
             outputStream = null
@@ -192,6 +253,11 @@ class SSHManager {
      * 检查连接状态
      */
     fun isConnected(): Boolean = session?.isConnected == true
+
+    /**
+     * 检查 Shell 是否就绪
+     */
+    fun isShellReady(): Boolean = outputStream != null && shellChannel?.isConnected == true
 
     /**
      * 获取服务器状态信息
@@ -230,14 +296,12 @@ class SSHManager {
                 )
             )
         } catch (e: Exception) {
+            Log.e(TAG, "获取状态失败", e)
             Result.failure(e)
         }
     }
 }
 
-/**
- * 服务器状态信息
- */
 data class ServerStatusInfo(
     val cpuUsage: Float,
     val memoryUsedMB: Long,

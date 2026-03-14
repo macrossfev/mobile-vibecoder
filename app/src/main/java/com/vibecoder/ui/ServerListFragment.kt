@@ -1,6 +1,9 @@
 package com.vibecoder.ui
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.SpeechRecognizer
@@ -8,11 +11,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.vibecoder.R
@@ -20,14 +22,12 @@ import com.vibecoder.data.PreferencesManager
 import com.vibecoder.data.ServerConfig
 import com.vibecoder.databinding.FragmentServerListBinding
 import com.vibecoder.databinding.DialogAddServerBinding
+import com.vibecoder.ssh.SSHKeyGenerator
 import com.vibecoder.voice.AICommandInterpreter
 import com.vibecoder.voice.VoiceInputManager
 import com.vibecoder.voice.VoiceResult
 import kotlinx.coroutines.launch
 
-/**
- * 服务器列表Fragment
- */
 class ServerListFragment : Fragment() {
 
     private var _binding: FragmentServerListBinding? = null
@@ -37,13 +37,15 @@ class ServerListFragment : Fragment() {
     private lateinit var serverAdapter: ServerAdapter
     private lateinit var voiceManager: VoiceInputManager
 
-    private val RECORD_AUDIO_PERMISSION = 1001
+    private val audioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            startVoiceInput()
+        }
+    }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentServerListBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -61,15 +63,9 @@ class ServerListFragment : Fragment() {
 
     private fun setupRecyclerView() {
         serverAdapter = ServerAdapter(
-            onServerClick = { server ->
-                openTerminal(server)
-            },
-            onServerLongClick = { server ->
-                showServerOptions(server)
-            },
-            onMonitorClick = { server ->
-                openMonitor(server)
-            }
+            onServerClick = { server -> openTerminal(server) },
+            onServerLongClick = { server -> showServerOptions(server) },
+            onMonitorClick = { server -> openMonitor(server) }
         )
 
         binding.recyclerView.apply {
@@ -79,46 +75,124 @@ class ServerListFragment : Fragment() {
     }
 
     private fun setupFab() {
-        binding.fabAddServer.setOnClickListener {
-            showAddServerDialog()
-        }
+        binding.fabAddServer.setOnClickListener { showAddServerDialog() }
 
-        // 语音快捷按钮
         binding.fabVoice.setOnClickListener {
-            if (checkAudioPermission()) {
-                startVoiceInput()
-            } else {
-                requestAudioPermission()
-            }
+            if (checkAudioPermission()) startVoiceInput() else requestAudioPermission()
         }
     }
 
     private fun loadServers() {
         val servers = prefsManager.getServers()
         serverAdapter.submitList(servers)
-
         binding.emptyView.visibility = if (servers.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun showAddServerDialog() {
         val dialogBinding = DialogAddServerBinding.inflate(layoutInflater)
 
+        // 设置认证方式切换
+        dialogBinding.rgAuthType.setOnCheckedChangeListener { _, checkedId ->
+            when (checkedId) {
+                dialogBinding.rbPassword.id -> {
+                    dialogBinding.tilPassword.visibility = View.VISIBLE
+                    dialogBinding.llKeyAuth.visibility = View.GONE
+                }
+                dialogBinding.rbKey.id -> {
+                    dialogBinding.tilPassword.visibility = View.GONE
+                    dialogBinding.llKeyAuth.visibility = View.VISIBLE
+                }
+            }
+        }
+
+        // 生成密钥按钮
+        dialogBinding.btnGenerateKey.setOnClickListener {
+            showKeyGenerationDialog(dialogBinding)
+        }
+
+        // 粘贴密钥按钮
+        dialogBinding.btnPasteKey.setOnClickListener {
+            val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = clipboard.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val text = clip.getItemAt(0).text?.toString() ?: ""
+                if (text.contains("PRIVATE KEY")) {
+                    dialogBinding.etPrivateKey.setText(text)
+                    Toast.makeText(requireContext(), "已粘贴私钥", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(requireContext(), "剪贴板中没有有效的私钥", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(requireContext(), "剪贴板为空", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // 复制公钥按钮
+        dialogBinding.btnCopyPublicKey.setOnClickListener {
+            val publicKey = dialogBinding.tvPublicKey.text.toString()
+            if (publicKey.isNotBlank()) {
+                val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Public Key", publicKey)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(requireContext(), "公钥已复制", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("添加服务器")
             .setView(dialogBinding.root)
             .setPositiveButton("保存") { _, _ ->
+                val isKeyAuth = dialogBinding.rbKey.isChecked
                 val server = ServerConfig(
                     name = dialogBinding.etName.text.toString(),
                     host = dialogBinding.etHost.text.toString(),
                     port = dialogBinding.etPort.text.toString().toIntOrNull() ?: 22,
                     username = dialogBinding.etUsername.text.toString(),
-                    password = dialogBinding.etPassword.text.toString()
+                    password = if (isKeyAuth) null else dialogBinding.etPassword.text.toString().ifBlank { null },
+                    privateKey = if (isKeyAuth) dialogBinding.etPrivateKey.text.toString().ifBlank { null } else null,
+                    passphrase = if (isKeyAuth) dialogBinding.etPassphrase.text.toString().ifBlank { null } else null
                 )
                 prefsManager.addServer(server)
                 loadServers()
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun showKeyGenerationDialog(dialogBinding: DialogAddServerBinding) {
+        val keyTypes = SSHKeyGenerator.getSupportedKeyTypes().map { it.displayName }.toTypedArray()
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("选择密钥类型")
+            .setItems(keyTypes) { _, which ->
+                val selectedType = SSHKeyGenerator.getSupportedKeyTypes()[which]
+                generateKeyPair(selectedType, dialogBinding)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun generateKeyPair(keyType: SSHKeyGenerator.KeyType, dialogBinding: DialogAddServerBinding) {
+        lifecycleScope.launch {
+            try {
+                val keyPair = SSHKeyGenerator.generateKeyPair(keyType)
+
+                // 填充私钥
+                dialogBinding.etPrivateKey.setText(keyPair.privateKey)
+
+                // 显示公钥
+                dialogBinding.tvPublicKey.text = keyPair.publicKey
+                dialogBinding.llPublicKey.visibility = View.VISIBLE
+
+                Toast.makeText(
+                    requireContext(),
+                    "密钥已生成\n指纹: ${keyPair.fingerprint}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "生成失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun showServerOptions(server: ServerConfig) {
@@ -142,19 +216,49 @@ class ServerListFragment : Fragment() {
             etHost.setText(server.host)
             etPort.setText(server.port.toString())
             etUsername.setText(server.username)
-            etPassword.setText(server.password)
+
+            // 根据认证方式设置UI
+            if (server.privateKey != null) {
+                rbKey.isChecked = true
+                tilPassword.visibility = View.GONE
+                llKeyAuth.visibility = View.VISIBLE
+                etPrivateKey.setText(server.privateKey)
+                etPassphrase.setText(server.passphrase)
+            } else {
+                rbPassword.isChecked = true
+                tilPassword.visibility = View.VISIBLE
+                llKeyAuth.visibility = View.GONE
+                etPassword.setText(server.password)
+            }
+
+            // 设置认证方式切换
+            rgAuthType.setOnCheckedChangeListener { _, checkedId ->
+                when (checkedId) {
+                    rbPassword.id -> {
+                        tilPassword.visibility = View.VISIBLE
+                        llKeyAuth.visibility = View.GONE
+                    }
+                    rbKey.id -> {
+                        tilPassword.visibility = View.GONE
+                        llKeyAuth.visibility = View.VISIBLE
+                    }
+                }
+            }
         }
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("编辑服务器")
             .setView(dialogBinding.root)
             .setPositiveButton("保存") { _, _ ->
+                val isKeyAuth = dialogBinding.rbKey.isChecked
                 val updated = server.copy(
                     name = dialogBinding.etName.text.toString(),
                     host = dialogBinding.etHost.text.toString(),
                     port = dialogBinding.etPort.text.toString().toIntOrNull() ?: 22,
                     username = dialogBinding.etUsername.text.toString(),
-                    password = dialogBinding.etPassword.text.toString()
+                    password = if (isKeyAuth) null else dialogBinding.etPassword.text.toString().ifBlank { null },
+                    privateKey = if (isKeyAuth) dialogBinding.etPrivateKey.text.toString().ifBlank { null } else null,
+                    passphrase = if (isKeyAuth) dialogBinding.etPassphrase.text.toString().ifBlank { null } else null
                 )
                 prefsManager.updateServer(updated)
                 loadServers()
@@ -176,47 +280,45 @@ class ServerListFragment : Fragment() {
     }
 
     private fun copyServerInfo(server: ServerConfig) {
-        // 复制到剪贴板
         val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                 as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText(
-            "Server Info",
-            "${server.username}@${server.host}:${server.port}"
-        )
+        val clip = android.content.ClipData.newPlainText("Server Info", "${server.username}@${server.host}:${server.port}")
         clipboard.setPrimaryClip(clip)
         Toast.makeText(requireContext(), "已复制到剪贴板", Toast.LENGTH_SHORT).show()
     }
 
     private fun openTerminal(server: ServerConfig) {
-        val action = ServerListFragmentDirections.actionServerListToTerminal(server)
-        findNavController().navigate(action)
+        val fragment = TerminalFragment.newInstance(server)
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
     }
 
     private fun openMonitor(server: ServerConfig) {
-        val action = ServerListFragmentDirections.actionServerListToMonitor(server)
-        findNavController().navigate(action)
+        val fragment = MonitorFragment.newInstance(server)
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
     }
 
-    // ===== 语音输入 =====
-
     private fun checkAudioPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            requireContext(),
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun requestAudioPermission() {
-        ActivityCompat.requestPermissions(
-            requireActivity(),
-            arrayOf(Manifest.permission.RECORD_AUDIO),
-            RECORD_AUDIO_PERMISSION
-        )
+        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     private fun startVoiceInput() {
         if (!SpeechRecognizer.isRecognitionAvailable(requireContext())) {
-            Toast.makeText(requireContext(), "语音识别不可用", Toast.LENGTH_SHORT).show()
+            // 国内手机通常没有 Google Play 服务，语音识别不可用
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("语音识别不可用")
+                .setMessage("您的设备不支持语音识别。\n\n请使用输入法直接输入命令，或安装支持语音识别的输入法（如讯飞输入法、百度输入法等）。")
+                .setPositiveButton("知道了", null)
+                .show()
             return
         }
 
@@ -226,9 +328,7 @@ class ServerListFragment : Fragment() {
         lifecycleScope.launch {
             voiceManager.startListening().collect { result ->
                 when (result) {
-                    is VoiceResult.Partial -> {
-                        binding.voiceStatus.text = "识别中: ${result.text}"
-                    }
+                    is VoiceResult.Partial -> binding.voiceStatus.text = "识别中: ${result.text}"
                     is VoiceResult.Final -> {
                         binding.voiceStatus.visibility = View.GONE
                         handleVoiceCommand(result.text)
@@ -237,9 +337,7 @@ class ServerListFragment : Fragment() {
                         binding.voiceStatus.visibility = View.GONE
                         Toast.makeText(requireContext(), result.message, Toast.LENGTH_SHORT).show()
                     }
-                    is VoiceResult.Ready -> {
-                        binding.voiceStatus.text = "请说话..."
-                    }
+                    is VoiceResult.Ready -> binding.voiceStatus.text = "请说话..."
                 }
             }
         }
@@ -252,13 +350,11 @@ class ServerListFragment : Fragment() {
             return
         }
 
-        // 显示识别到的文本
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("语音命令")
             .setMessage("识别结果: \"$text\"\n\n选择要执行的服务器:")
             .setItems(servers.map { it.name }.toTypedArray()) { _, which ->
-                val server = servers[which]
-                interpretAndExecute(text, server)
+                interpretAndExecute(text, servers[which])
             }
             .setNegativeButton("取消", null)
             .show()
@@ -284,12 +380,8 @@ class ServerListFragment : Fragment() {
             binding.voiceStatus.visibility = View.GONE
 
             result.fold(
-                onSuccess = { commandResult ->
-                    showCommandPreview(server, commandResult)
-                },
-                onFailure = { error ->
-                    Toast.makeText(requireContext(), "理解失败: ${error.message}", Toast.LENGTH_SHORT).show()
-                }
+                onSuccess = { commandResult -> showCommandPreview(server, commandResult) },
+                onFailure = { error -> Toast.makeText(requireContext(), "理解失败: ${error.message}", Toast.LENGTH_SHORT).show() }
             )
         }
     }
@@ -297,32 +389,19 @@ class ServerListFragment : Fragment() {
     private fun showCommandPreview(server: ServerConfig, commandResult: AICommandInterpreter.CommandResult) {
         val message = buildString {
             append("命令: ${commandResult.command}\n\n")
-            append("说明: ${commandResult.explanation}\n\n")
-            if (commandResult.dangerous) {
-                append("⚠️ 警告: 此命令可能有风险！")
-            }
+            append("说明: ${commandResult.explanation}")
+            if (commandResult.dangerous) append("\n\n⚠️ 警告: 此命令可能有风险！")
         }
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("确认执行")
             .setMessage(message)
-            .setPositiveButton("执行") { _, _ ->
-                openTerminalWithCommand(server, commandResult.command)
-            }
+            .setPositiveButton("执行") { _, _ -> openTerminal(server) }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    private fun openTerminalWithCommand(server: ServerConfig, command: String) {
-        // TODO: 打开终端并预填命令
-        openTerminal(server)
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == RECORD_AUDIO_PERMISSION && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             startVoiceInput()
