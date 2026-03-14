@@ -166,15 +166,6 @@ class TerminalFragment : Fragment() {
         binding.btnLeft.setOnClickListener { sendArrowKey("left") }
         binding.btnRight.setOnClickListener { sendArrowKey("right") }
 
-        binding.btnCtrlC.setOnClickListener {
-            lifecycleScope.launch { sshManager.sendCtrlC() }
-        }
-
-        binding.btnCtrlD.setOnClickListener {
-            lifecycleScope.launch { sshManager.sendCtrlD() }
-        }
-
-        binding.btnTab.setOnClickListener { sendTab() }
         binding.btnEsc.setOnClickListener { sendEsc() }
     }
 
