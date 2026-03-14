@@ -96,8 +96,17 @@ class TerminalFragment : Fragment() {
         setupDirectionKeys()
         setupCustomKeys()
 
-        // 只有在未连接时才连接
-        if (!sshManager.isConnected()) {
+        // 检查连接状态
+        if (sshManager.isConnected() && sshManager.isShellReady()) {
+            // 已连接且 Shell 就绪，只需要重新等待 WebView 就绪
+            isTerminalReady = false
+            // 调整 PTY 大小以匹配新屏幕尺寸
+            sshManager.resizePty(terminalCols, terminalRows)
+        } else if (sshManager.isConnected() && !sshManager.isShellReady()) {
+            // SSH 连接但 Shell 未就绪，需要重新打开 Shell
+            startShell()
+        } else {
+            // 未连接，执行连接
             connect(currentServer)
         }
     }
@@ -263,7 +272,13 @@ class TerminalFragment : Fragment() {
         if (command.isEmpty()) return
 
         if (!sshManager.isShellReady()) {
-            Toast.makeText(requireContext(), "Shell未就绪", Toast.LENGTH_SHORT).show()
+            // 检查连接状态
+            if (!sshManager.isConnected()) {
+                Toast.makeText(requireContext(), "SSH未连接，正在重连...", Toast.LENGTH_SHORT).show()
+                server?.let { connect(it) }
+            } else {
+                Toast.makeText(requireContext(), "Shell初始化中，请稍候...", Toast.LENGTH_SHORT).show()
+            }
             return
         }
 
@@ -274,7 +289,12 @@ class TerminalFragment : Fragment() {
     }
 
     private fun sendEnter() {
-        if (!sshManager.isShellReady()) return
+        if (!sshManager.isShellReady()) {
+            if (!sshManager.isConnected()) {
+                server?.let { connect(it) }
+            }
+            return
+        }
         lifecycleScope.launch {
             sshManager.sendEnterAsync()
         }
