@@ -198,8 +198,8 @@ class SSHManager {
     suspend fun sendEnterAsync(): Boolean = withContext(Dispatchers.IO) {
         try {
             val os = outputStream ?: return@withContext false
-            // 发送 \r\n 组合，兼容各种终端和交互式程序
-            os.write("\r\n".toByteArray(StandardCharsets.UTF_8))
+            // 只发送 \r（回车），PTY 会自动处理换行
+            os.write("\r".toByteArray(StandardCharsets.UTF_8))
             os.flush()
             true
         } catch (e: Exception) {
