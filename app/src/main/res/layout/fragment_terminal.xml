@@ -6,125 +6,22 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- 终端输出区域 - 使用 WebView + xterm.js -->
+    <!-- 终端输出区域 -->
     <WebView
         android:id="@+id/terminal_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:background="#000000"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/quick_keys" />
+        app:layout_constraintBottom_toTopOf="@id/input_area" />
 
-    <!-- 快捷键栏 -->
+    <!-- 隐藏的快捷键栏（保持兼容） -->
     <LinearLayout
         android:id="@+id/quick_keys"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="0dp"
-        android:background="#1E1E1E"
-        app:layout_constraintBottom_toTopOf="@id/input_area">
-
-        <Button
-            android:id="@+id/btn_ctrl_c"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="28dp"
-            android:layout_weight="1"
-            android:text="Ctrl+C"
-            android:textColor="@android:color/white"
-            android:textSize="9sp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
-
-        <Button
-            android:id="@+id/btn_ctrl_d"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="28dp"
-            android:layout_weight="1"
-            android:text="Ctrl+D"
-            android:textColor="@android:color/white"
-            android:textSize="9sp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
-
-        <Button
-            android:id="@+id/btn_tab"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="28dp"
-            android:layout_weight="1"
-            android:text="Tab"
-            android:textColor="@android:color/white"
-            android:textSize="9sp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
-
-        <Button
-            android:id="@+id/btn_esc"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="28dp"
-            android:layout_weight="1"
-            android:text="Esc"
-            android:textColor="@android:color/white"
-            android:textSize="9sp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
-
-        <!-- 3个可自定义快捷键 -->
-        <Button
-            android:id="@+id/btn_custom1"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="28dp"
-            android:layout_weight="1"
-            android:text="F1"
-            android:textColor="#4CAF50"
-            android:textSize="9sp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
-
-        <Button
-            android:id="@+id/btn_custom2"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="28dp"
-            android:layout_weight="1"
-            android:text="F2"
-            android:textColor="#4CAF50"
-            android:textSize="9sp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
-
-        <Button
-            android:id="@+id/btn_custom3"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="28dp"
-            android:layout_weight="1"
-            android:text="F3"
-            android:textColor="#4CAF50"
-            android:textSize="9sp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
-
-    </LinearLayout>
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/input_area" />
 
     <!-- 输入区域 + 方向键 -->
     <LinearLayout
@@ -137,54 +34,81 @@
         android:gravity="center_vertical"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- 左侧：输入框和按钮 -->
-        <LinearLayout
+        <!-- 左侧：输入框 -->
+        <EditText
+            android:id="@+id/et_command"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:background="@android:color/transparent"
+            android:fontFamily="monospace"
+            android:hint="$"
+            android:inputType="textMultiLine"
+            android:maxLines="2"
+            android:textColor="@android:color/white"
+            android:textColorHint="#666666"
+            android:textSize="12sp"
+            android:imeOptions="actionNone"
+            android:padding="2dp" />
 
-            <EditText
-                android:id="@+id/et_command"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@android:color/transparent"
-                android:fontFamily="monospace"
-                android:hint="$"
-                android:inputType="textMultiLine"
-                android:maxLines="2"
-                android:textColor="@android:color/white"
-                android:textColorHint="#666666"
-                android:textSize="12sp"
-                android:imeOptions="actionNone"
-                android:padding="2dp" />
+        <!-- Esc 和自定义快捷键 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
             <Button
-                android:id="@+id/btn_send"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:id="@+id/btn_esc"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:layout_marginStart="1dp"
-                android:text="输入"
-                android:textSize="10sp"
+                android:layout_height="26dp"
+                android:text="Esc"
+                android:textColor="@android:color/white"
+                android:textSize="9sp"
                 android:padding="0dp"
-                android:minWidth="36dp"
+                android:minWidth="0dp"
                 android:minHeight="0dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp" />
 
             <Button
-                android:id="@+id/btn_enter"
-                style="@style/Widget.MaterialComponents.Button"
+                android:id="@+id/btn_custom1"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:layout_marginStart="1dp"
-                android:text="回车"
-                android:textSize="10sp"
+                android:layout_height="26dp"
+                android:text="F1"
+                android:textColor="#4CAF50"
+                android:textSize="9sp"
                 android:padding="0dp"
-                android:minWidth="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp" />
+
+            <Button
+                android:id="@+id/btn_custom2"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:text="F2"
+                android:textColor="#4CAF50"
+                android:textSize="9sp"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp" />
+
+            <Button
+                android:id="@+id/btn_custom3"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:text="F3"
+                android:textColor="#4CAF50"
+                android:textSize="9sp"
+                android:padding="0dp"
+                android:minWidth="0dp"
                 android:minHeight="0dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp" />
@@ -203,10 +127,10 @@
                 android:id="@+id/btn_up"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="32dp"
-                android:layout_height="24dp"
+                android:layout_height="22dp"
                 android:text="↑"
                 android:textColor="@android:color/white"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:padding="0dp"
                 android:minHeight="0dp"
                 android:insetTop="0dp"
@@ -221,10 +145,10 @@
                     android:id="@+id/btn_left"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="32dp"
-                    android:layout_height="24dp"
+                    android:layout_height="22dp"
                     android:text="←"
                     android:textColor="@android:color/white"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:padding="0dp"
                     android:minHeight="0dp"
                     android:insetTop="0dp"
@@ -234,10 +158,10 @@
                     android:id="@+id/btn_down"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="32dp"
-                    android:layout_height="24dp"
+                    android:layout_height="22dp"
                     android:text="↓"
                     android:textColor="@android:color/white"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:padding="0dp"
                     android:minHeight="0dp"
                     android:insetTop="0dp"
@@ -247,16 +171,51 @@
                     android:id="@+id/btn_right"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="32dp"
-                    android:layout_height="24dp"
+                    android:layout_height="22dp"
                     android:text="→"
                     android:textColor="@android:color/white"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:padding="0dp"
                     android:minHeight="0dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp" />
 
             </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- 输入/回车按钮 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="2dp">
+
+            <Button
+                android:id="@+id/btn_send"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="22dp"
+                android:text="输入"
+                android:textSize="9sp"
+                android:padding="0dp"
+                android:minWidth="32dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp" />
+
+            <Button
+                android:id="@+id/btn_enter"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="22dp"
+                android:text="回车"
+                android:textSize="9sp"
+                android:padding="0dp"
+                android:minWidth="32dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp" />
 
         </LinearLayout>
 
