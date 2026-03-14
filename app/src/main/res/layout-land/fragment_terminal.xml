@@ -45,166 +45,168 @@
             android:padding="2dp"
             android:minHeight="26dp" />
 
-        <!-- 2. Esc 和自定义快捷键 -->
-        <LinearLayout
+        <!-- 2. Esc 按钮 -->
+        <Button
+            android:id="@+id/btn_esc"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_height="26dp"
+            android:layout_marginStart="2dp"
+            android:text="Esc"
+            android:textColor="@android:color/white"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="36dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#555555"
+            app:strokeWidth="1dp" />
 
-            <Button
-                android:id="@+id/btn_esc"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="26dp"
-                android:text="Esc"
-                android:textColor="@android:color/white"
-                android:textSize="9sp"
-                android:padding="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
-
-            <Button
-                android:id="@+id/btn_custom1"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="26dp"
-                android:text="F1"
-                android:textColor="#4CAF50"
-                android:textSize="9sp"
-                android:padding="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
-
-            <Button
-                android:id="@+id/btn_custom2"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="26dp"
-                android:text="F2"
-                android:textColor="#4CAF50"
-                android:textSize="9sp"
-                android:padding="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
-
-            <Button
-                android:id="@+id/btn_custom3"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="26dp"
-                android:text="F3"
-                android:textColor="#4CAF50"
-                android:textSize="9sp"
-                android:padding="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
-
-        </LinearLayout>
-
-        <!-- 3. 方向键 -->
-        <LinearLayout
+        <!-- 3. 自定义快捷键 -->
+        <Button
+            android:id="@+id/btn_custom1"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginStart="2dp">
+            android:layout_height="26dp"
+            android:layout_marginStart="2dp"
+            android:text="Ctrl+C"
+            android:textColor="#4CAF50"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="44dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#4CAF50"
+            app:strokeWidth="1dp" />
 
-            <Button
-                android:id="@+id/btn_up"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="28dp"
-                android:layout_height="26dp"
-                android:text="↑"
-                android:textColor="@android:color/white"
-                android:textSize="11sp"
-                android:padding="0dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
-
-            <Button
-                android:id="@+id/btn_down"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="28dp"
-                android:layout_height="26dp"
-                android:text="↓"
-                android:textColor="@android:color/white"
-                android:textSize="11sp"
-                android:padding="0dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
-
-            <Button
-                android:id="@+id/btn_left"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="28dp"
-                android:layout_height="26dp"
-                android:text="←"
-                android:textColor="@android:color/white"
-                android:textSize="11sp"
-                android:padding="0dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
-
-            <Button
-                android:id="@+id/btn_right"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="28dp"
-                android:layout_height="26dp"
-                android:text="→"
-                android:textColor="@android:color/white"
-                android:textSize="11sp"
-                android:padding="0dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
-
-        </LinearLayout>
-
-        <!-- 4. 输入/回车按钮 -->
-        <LinearLayout
+        <Button
+            android:id="@+id/btn_custom2"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginStart="2dp">
+            android:layout_height="26dp"
+            android:layout_marginStart="2dp"
+            android:text="Ctrl+D"
+            android:textColor="#4CAF50"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="44dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#4CAF50"
+            app:strokeWidth="1dp" />
 
-            <Button
-                android:id="@+id/btn_send"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="26dp"
-                android:text="输入"
-                android:textSize="9sp"
-                android:padding="0dp"
-                android:minWidth="32dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
+        <Button
+            android:id="@+id/btn_custom3"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:layout_marginStart="2dp"
+            android:text="Tab"
+            android:textColor="#4CAF50"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="36dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#4CAF50"
+            app:strokeWidth="1dp" />
 
-            <Button
-                android:id="@+id/btn_enter"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="wrap_content"
-                android:layout_height="26dp"
-                android:text="回车"
-                android:textSize="9sp"
-                android:padding="0dp"
-                android:minWidth="32dp"
-                android:minHeight="0dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp" />
+        <!-- 4. 方向键 -->
+        <Button
+            android:id="@+id/btn_up"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="28dp"
+            android:layout_height="26dp"
+            android:layout_marginStart="4dp"
+            android:text="↑"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#555555"
+            app:strokeWidth="1dp" />
 
-        </LinearLayout>
+        <Button
+            android:id="@+id/btn_down"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="28dp"
+            android:layout_height="26dp"
+            android:text="↓"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#555555"
+            app:strokeWidth="1dp" />
+
+        <Button
+            android:id="@+id/btn_left"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="28dp"
+            android:layout_height="26dp"
+            android:text="←"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#555555"
+            app:strokeWidth="1dp" />
+
+        <Button
+            android:id="@+id/btn_right"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="28dp"
+            android:layout_height="26dp"
+            android:text="→"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#555555"
+            app:strokeWidth="1dp" />
+
+        <!-- 5. 输入/回车按钮 -->
+        <Button
+            android:id="@+id/btn_send"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:layout_marginStart="2dp"
+            android:text="输入"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="32dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#555555"
+            app:strokeWidth="1dp" />
+
+        <Button
+            android:id="@+id/btn_enter"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:layout_marginStart="2dp"
+            android:text="回车"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="32dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
 
     </LinearLayout>
 

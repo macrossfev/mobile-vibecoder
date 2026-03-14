@@ -51,8 +51,28 @@ class TerminalFragment : Fragment() {
     private val FLUSH_INTERVAL = 50L
 
     // 自定义快捷键设置
-    private var customKeyLabels = arrayOf("F1", "F2", "F3")
-    private var customKeyCommands = arrayOf("", "", "")
+    private var customKeyLabels = arrayOf("Ctrl+C", "Ctrl+D", "Tab")
+    private var customKeyCommands = arrayOf("\u0003", "\u0004", "\t")  // Ctrl+C, Ctrl+D, Tab
+
+    // 预设组合键选项
+    private val presetKeys = listOf(
+        "Ctrl+C" to "\u0003",
+        "Ctrl+D" to "\u0004",
+        "Ctrl+Z" to "\u001A",
+        "Tab" to "\t",
+        "Esc" to "\u001B",
+        "F1" to "\u001BOP",
+        "F2" to "\u001BOQ",
+        "F3" to "\u001BOR",
+        "F4" to "\u001BOS",
+        "F5" to "\u001B[15~",
+        "F6" to "\u001B[17~",
+        "F7" to "\u001B[18~",
+        "F8" to "\u001B[19~"
+    )
+
+    // 标记 tmux 是否已附加
+    private var tmuxAttached = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -198,6 +218,12 @@ class TerminalFragment : Fragment() {
     private fun loadCustomKeys() {
         customKeyLabels = prefsManager.getCustomKeyLabels()
         customKeyCommands = prefsManager.getCustomKeyCommands()
+
+        // 如果是旧的空值，设置默认值
+        if (customKeyLabels.all { it.isBlank() }) {
+            customKeyLabels = arrayOf("Ctrl+C", "Ctrl+D", "Tab")
+            customKeyCommands = arrayOf("\u0003", "\u0004", "\t")
+        }
     }
 
     private fun saveCustomKeys() {
@@ -206,31 +232,14 @@ class TerminalFragment : Fragment() {
     }
 
     private fun editCustomKey(index: Int) {
-        val container = android.widget.LinearLayout(requireContext()).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(48, 36, 48, 24)
-        }
-
-        val labelEdit = android.widget.EditText(requireContext()).apply {
-            hint = "按钮名称"
-            setText(customKeyLabels[index])
-        }
-        container.addView(labelEdit)
-
-        val commandEdit = android.widget.EditText(requireContext()).apply {
-            hint = "发送的内容（留空则发送功能键）"
-            setText(customKeyCommands[index])
-            setSingleLine(false)
-            minLines = 2
-        }
-        container.addView(commandEdit)
+        val presetNames = presetKeys.map { it.first }.toTypedArray()
+        val currentIndex = presetNames.indexOf(customKeyLabels[index]).coerceAtLeast(0)
 
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("编辑快捷键")
-            .setView(container)
-            .setPositiveButton("保存") { _, _ ->
-                customKeyLabels[index] = labelEdit.text.toString().ifBlank { "F${index + 1}" }
-                customKeyCommands[index] = commandEdit.text.toString()
+            .setTitle("选择快捷键")
+            .setSingleChoiceItems(presetNames, currentIndex) { dialog, which ->
+                customKeyLabels[index] = presetKeys[which].first
+                customKeyCommands[index] = presetKeys[which].second
                 saveCustomKeys()
 
                 // 更新按钮
@@ -240,7 +249,7 @@ class TerminalFragment : Fragment() {
                     2 -> binding.btnCustom3.text = customKeyLabels[2]
                 }
 
-                Toast.makeText(requireContext(), "已保存", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
             }
             .setNegativeButton("取消", null)
             .show()
@@ -249,20 +258,8 @@ class TerminalFragment : Fragment() {
     private fun executeCustomKey(index: Int) {
         val command = customKeyCommands[index]
         if (command.isNotBlank()) {
-            // 发送自定义命令
             lifecycleScope.launch {
                 sshManager.writeToShellAsync(command)
-            }
-        } else {
-            // 默认发送功能键 F1-F3
-            val keyCode = when (index) {
-                0 -> "\u001BOP"   // F1
-                1 -> "\u001BOQ"   // F2
-                2 -> "\u001BOR"   // F3
-                else -> return
-            }
-            lifecycleScope.launch {
-                sshManager.writeToShellAsync(keyCode)
             }
         }
     }
@@ -374,14 +371,7 @@ class TerminalFragment : Fragment() {
 
                 result.fold(
                     onSuccess = {
-                        // Shell 就绪后，检查是否启用 tmux
-                        server?.let { srv ->
-                            if (srv.useTmux) {
-                                // 延迟发送 tmux 命令，等待 shell 完全就绪
-                                Thread.sleep(500)
-                                attachTmuxSession(srv.tmuxSession)
-                            }
-                        }
+                        // Shell 就绪，tmux 附加在 TerminalJsInterface.onReady 中处理
                     },
                     onFailure = { error ->
                         if (isAdded && activity != null) {
@@ -509,6 +499,15 @@ class TerminalFragment : Fragment() {
             // 终端就绪后刷新缓冲区中的待处理数据
             activity?.runOnUiThread {
                 flushPendingOutput()
+                // 如果 tmux 未附加且已启用，附加 tmux
+                if (!tmuxAttached) {
+                    server?.let { srv ->
+                        if (srv.useTmux && sshManager.isShellReady()) {
+                            tmuxAttached = true
+                            attachTmuxSession(srv.tmuxSession)
+                        }
+                    }
+                }
             }
         }
 
