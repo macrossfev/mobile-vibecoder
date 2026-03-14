@@ -206,27 +206,28 @@ class TerminalFragment : Fragment() {
     }
 
     private fun editCustomKey(index: Int) {
-        val dialogView = layoutInflater.inflate(android.R.layout.linear_layout, null)
+        val container = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(48, 36, 48, 24)
+        }
+
         val labelEdit = android.widget.EditText(requireContext()).apply {
             hint = "按钮名称"
             setText(customKeyLabels[index])
         }
+        container.addView(labelEdit)
+
         val commandEdit = android.widget.EditText(requireContext()).apply {
             hint = "发送的内容（留空则发送功能键）"
             setText(customKeyCommands[index])
             setSingleLine(false)
             minLines = 2
         }
-        (dialogView as android.widget.LinearLayout).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(32, 24, 32, 16)
-            addView(labelEdit)
-            addView(commandEdit)
-        }
+        container.addView(commandEdit)
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("编辑快捷键")
-            .setView(dialogView)
+            .setView(container)
             .setPositiveButton("保存") { _, _ ->
                 customKeyLabels[index] = labelEdit.text.toString().ifBlank { "F${index + 1}" }
                 customKeyCommands[index] = commandEdit.text.toString()
