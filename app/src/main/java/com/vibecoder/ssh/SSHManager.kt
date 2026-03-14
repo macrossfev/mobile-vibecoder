@@ -260,6 +260,18 @@ class SSHManager {
     fun isShellReady(): Boolean = outputStream != null && shellChannel?.isConnected == true
 
     /**
+     * 调整 PTY 大小（横竖屏切换时调用）
+     */
+    fun resizePty(cols: Int, rows: Int) {
+        try {
+            shellChannel?.setPtySize(cols, rows, cols * 8, rows * 16)
+            Log.d(TAG, "PTY resized to $cols x $rows")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to resize PTY", e)
+        }
+    }
+
+    /**
      * 获取服务器状态信息
      */
     suspend fun fetchServerStatus(): Result<ServerStatusInfo> = withContext(Dispatchers.IO) {

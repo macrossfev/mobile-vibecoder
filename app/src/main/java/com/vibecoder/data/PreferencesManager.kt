@@ -91,6 +91,29 @@ class PreferencesManager(context: Context) {
     fun isKeepScreenOn(): Boolean = prefs.getBoolean(KEY_KEEP_SCREEN_ON, false)
     fun setKeepScreenOn(on: Boolean) = prefs.edit().putBoolean(KEY_KEEP_SCREEN_ON, on).apply()
 
+    // 自定义快捷键
+    fun getCustomKeyLabels(): Array<String> {
+        val json = prefs.getString(KEY_CUSTOM_LABELS, null) ?: return arrayOf("F1", "F2", "F3")
+        val type = object : TypeToken<List<String>>() {}.type
+        val list: List<String> = gson.fromJson(json, type)
+        return list.toTypedArray()
+    }
+
+    fun saveCustomKeyLabels(labels: Array<String>) {
+        prefs.edit().putString(KEY_CUSTOM_LABELS, gson.toJson(labels.toList())).apply()
+    }
+
+    fun getCustomKeyCommands(): Array<String> {
+        val json = prefs.getString(KEY_CUSTOM_COMMANDS, null) ?: return arrayOf("", "", "")
+        val type = object : TypeToken<List<String>>() {}.type
+        val list: List<String> = gson.fromJson(json, type)
+        return list.toTypedArray()
+    }
+
+    fun saveCustomKeyCommands(commands: Array<String>) {
+        prefs.edit().putString(KEY_CUSTOM_COMMANDS, gson.toJson(commands.toList())).apply()
+    }
+
     private fun getDefaultQuickCommands(): List<QuickCommand> {
         return listOf(
             QuickCommand(1, "查看系统状态", "top -bn1 | head -20"),
@@ -114,5 +137,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_API_KEY = "api_key"
         private const val KEY_API_ENDPOINT = "api_endpoint"
         private const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
+        private const val KEY_CUSTOM_LABELS = "custom_key_labels"
+        private const val KEY_CUSTOM_COMMANDS = "custom_key_commands"
     }
 }

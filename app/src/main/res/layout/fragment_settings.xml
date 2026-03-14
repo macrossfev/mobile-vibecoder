@@ -92,67 +92,6 @@
 
         </androidx.cardview.widget.CardView>
 
-        <!-- 语音设置 -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="语音设置"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="语音识别服务" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/tv_voice_provider"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="系统语音识别"
-                            android:textColor="@android:color/darker_gray" />
-
-                        <Button
-                            android:id="@+id/btn_select_voice_provider"
-                            style="@style/Widget.MaterialComponents.Button.TextButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="选择" />
-
-                    </LinearLayout>
-
-                </LinearLayout>
-
-            </LinearLayout>
-
-        </androidx.cardview.widget.CardView>
-
         <!-- AI设置 -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -178,7 +117,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="配置OpenAI兼容的API来理解语音命令"
+                    android:text="配置OpenAI兼容的API来理解命令"
                     android:textColor="@android:color/darker_gray"
                     android:textSize="12sp" />
 
@@ -253,7 +192,7 @@
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="关于 VibeCoder"
+                    android:text="关于 MobileVibeCoder"
                     android:textAlignment="textStart" />
 
             </LinearLayout>

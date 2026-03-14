@@ -1,8 +1,6 @@
 package com.vibecoder.ui
 
-import android.Manifest
 import android.annotation.SuppressLint
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -15,8 +13,6 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -27,9 +23,6 @@ import com.vibecoder.data.PreferencesManager
 import com.vibecoder.data.ServerConfig
 import com.vibecoder.databinding.FragmentTerminalBinding
 import com.vibecoder.ssh.SSHManager
-import com.vibecoder.voice.AICommandInterpreter
-import com.vibecoder.voice.VoiceInputManager
-import com.vibecoder.voice.VoiceResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -41,7 +34,6 @@ class TerminalFragment : Fragment() {
     private var server: ServerConfig? = null
     private lateinit var sshManager: SSHManager
     private lateinit var prefsManager: PreferencesManager
-    private lateinit var voiceManager: VoiceInputManager
 
     private var shellJob: Job? = null
     private var commandHistoryIndex = -1
@@ -58,14 +50,9 @@ class TerminalFragment : Fragment() {
     private var lastFlushTime = 0L
     private val FLUSH_INTERVAL = 50L
 
-    // 权限请求
-    private val audioPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            startVoiceInput()
-        }
-    }
+    // 自定义快捷键设置
+    private var customKeyLabels = arrayOf("F1", "F2", "F3")
+    private var customKeyCommands = arrayOf("", "", "")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,6 +60,9 @@ class TerminalFragment : Fragment() {
         if (!serverJson.isNullOrBlank()) {
             server = Gson().fromJson(serverJson, ServerConfig::class.java)
         }
+
+        // 保存 Fragment 状态，防止重建
+        retainInstance = true
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -90,14 +80,26 @@ class TerminalFragment : Fragment() {
             return
         }
 
-        sshManager = SSHManager()
-        prefsManager = PreferencesManager(requireContext())
-        voiceManager = VoiceInputManager(requireContext())
+        if (!::sshManager.isInitialized) {
+            sshManager = SSHManager()
+        }
+
+        if (!::prefsManager.isInitialized) {
+            prefsManager = PreferencesManager(requireContext())
+        }
+
+        // 加载自定义快捷键设置
+        loadCustomKeys()
 
         setupTerminal()
         setupInput()
-        setupVoice()
-        connect(currentServer)
+        setupDirectionKeys()
+        setupCustomKeys()
+
+        // 只有在未连接时才连接
+        if (!sshManager.isConnected()) {
+            connect(currentServer)
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -158,6 +160,112 @@ class TerminalFragment : Fragment() {
         loadCommandHistory()
     }
 
+    private fun setupDirectionKeys() {
+        binding.btnUp.setOnClickListener { sendArrowKey("up") }
+        binding.btnDown.setOnClickListener { sendArrowKey("down") }
+        binding.btnLeft.setOnClickListener { sendArrowKey("left") }
+        binding.btnRight.setOnClickListener { sendArrowKey("right") }
+
+        binding.btnCtrlC.setOnClickListener {
+            lifecycleScope.launch { sshManager.sendCtrlC() }
+        }
+
+        binding.btnCtrlD.setOnClickListener {
+            lifecycleScope.launch { sshManager.sendCtrlD() }
+        }
+
+        binding.btnTab.setOnClickListener { sendTab() }
+        binding.btnEsc.setOnClickListener { sendEsc() }
+    }
+
+    private fun setupCustomKeys() {
+        // 设置按钮文本
+        binding.btnCustom1.text = customKeyLabels[0]
+        binding.btnCustom2.text = customKeyLabels[1]
+        binding.btnCustom3.text = customKeyLabels[2]
+
+        // 长按编辑
+        binding.btnCustom1.setOnLongClickListener { editCustomKey(0); true }
+        binding.btnCustom2.setOnLongClickListener { editCustomKey(1); true }
+        binding.btnCustom3.setOnLongClickListener { editCustomKey(2); true }
+
+        // 点击执行
+        binding.btnCustom1.setOnClickListener { executeCustomKey(0) }
+        binding.btnCustom2.setOnClickListener { executeCustomKey(1) }
+        binding.btnCustom3.setOnClickListener { executeCustomKey(2) }
+    }
+
+    private fun loadCustomKeys() {
+        customKeyLabels = prefsManager.getCustomKeyLabels()
+        customKeyCommands = prefsManager.getCustomKeyCommands()
+    }
+
+    private fun saveCustomKeys() {
+        prefsManager.saveCustomKeyLabels(customKeyLabels)
+        prefsManager.saveCustomKeyCommands(customKeyCommands)
+    }
+
+    private fun editCustomKey(index: Int) {
+        val dialogView = layoutInflater.inflate(android.R.layout.linear_layout, null)
+        val labelEdit = android.widget.EditText(requireContext()).apply {
+            hint = "按钮名称"
+            setText(customKeyLabels[index])
+        }
+        val commandEdit = android.widget.EditText(requireContext()).apply {
+            hint = "发送的内容（留空则发送功能键）"
+            setText(customKeyCommands[index])
+            setSingleLine(false)
+            minLines = 2
+        }
+        (dialogView as android.widget.LinearLayout).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(32, 24, 32, 16)
+            addView(labelEdit)
+            addView(commandEdit)
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("编辑快捷键")
+            .setView(dialogView)
+            .setPositiveButton("保存") { _, _ ->
+                customKeyLabels[index] = labelEdit.text.toString().ifBlank { "F${index + 1}" }
+                customKeyCommands[index] = commandEdit.text.toString()
+                saveCustomKeys()
+
+                // 更新按钮
+                when (index) {
+                    0 -> binding.btnCustom1.text = customKeyLabels[0]
+                    1 -> binding.btnCustom2.text = customKeyLabels[1]
+                    2 -> binding.btnCustom3.text = customKeyLabels[2]
+                }
+
+                Toast.makeText(requireContext(), "已保存", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun executeCustomKey(index: Int) {
+        val command = customKeyCommands[index]
+        if (command.isNotBlank()) {
+            // 发送自定义命令
+            lifecycleScope.launch {
+                sshManager.writeToShellAsync(command)
+            }
+        } else {
+            // 默认发送功能键 F1-F3
+            val keyCode = when (index) {
+                0 -> "\u001BOP"   // F1
+                1 -> "\u001BOQ"   // F2
+                2 -> "\u001BOR"   // F3
+                else -> return
+            }
+            lifecycleScope.launch {
+                sshManager.writeToShellAsync(keyCode)
+            }
+        }
+    }
+
     private fun inputText() {
         val command = binding.etCommand.text.toString()
         if (command.isEmpty()) return
@@ -194,43 +302,35 @@ class TerminalFragment : Fragment() {
         }
     }
 
-    private fun setupVoice() {
-        binding.btnVoice.setOnClickListener {
-            if (checkAudioPermission()) startVoiceInput() else requestAudioPermission()
+    private fun sendArrowKey(direction: String) {
+        if (!sshManager.isShellReady()) return
+        val sequence = when (direction) {
+            "up" -> "\u001B[A"
+            "down" -> "\u001B[B"
+            "left" -> "\u001B[D"
+            "right" -> "\u001B[C"
+            else -> return
         }
-
-        binding.btnCtrlC.setOnClickListener {
-            lifecycleScope.launch { sshManager.sendCtrlC() }
+        lifecycleScope.launch {
+            sshManager.writeToShellAsync(sequence)
         }
-
-        binding.btnCtrlD.setOnClickListener {
-            lifecycleScope.launch { sshManager.sendCtrlD() }
-        }
-
-        binding.btnTab.setOnClickListener { sendTab() }
-        binding.btnEsc.setOnClickListener { sendEsc() }
     }
 
     private fun connect(serverConfig: ServerConfig) {
-        updateStatus("正在连接 ${serverConfig.name}...")
-
         lifecycleScope.launch {
             try {
                 val result = sshManager.connect(serverConfig)
 
                 result.fold(
                     onSuccess = {
-                        updateStatus("SSH已连接，正在打开Shell...")
                         startShell()
                     },
                     onFailure = { error ->
-                        updateStatus("连接失败: ${error.message}")
                         showError("连接失败", error.message ?: "未知错误")
                     }
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
-                updateStatus("连接异常: ${e.message}")
                 showError("连接异常", e.message ?: "未知错误")
             }
         }
@@ -255,13 +355,7 @@ class TerminalFragment : Fragment() {
                             }
                         }
                     },
-                    onConnected = {
-                        if (isAdded && activity != null) {
-                            activity?.runOnUiThread {
-                                updateStatus("Shell就绪")
-                            }
-                        }
-                    },
+                    onConnected = { },
                     cols = terminalCols,
                     rows = terminalRows
                 )
@@ -271,7 +365,7 @@ class TerminalFragment : Fragment() {
                     onFailure = { error ->
                         if (isAdded && activity != null) {
                             activity?.runOnUiThread {
-                                updateStatus("Shell错误: ${error.message}")
+                                Toast.makeText(requireContext(), "Shell错误: ${error.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -313,14 +407,6 @@ class TerminalFragment : Fragment() {
 
         lastFlushTime = System.currentTimeMillis()
 
-        // 调试：打印实际发送的内容（转义控制字符）
-        val debugText = text
-            .replace("\u001B", "\\e")
-            .replace("\r", "\\r")
-            .replace("\n", "\\n")
-            .replace("\t", "\\t")
-        android.util.Log.d("TerminalOutput", "Sending ${text.length} chars: $debugText")
-
         activity?.runOnUiThread {
             try {
                 val base64 = Base64.encodeToString(text.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
@@ -346,15 +432,6 @@ class TerminalFragment : Fragment() {
         }
     }
 
-    private fun updateStatus(status: String) {
-        if (!isAdded || activity == null) return
-        activity?.runOnUiThread {
-            if (_binding != null) {
-                binding.tvStatus.text = status
-            }
-        }
-    }
-
     private fun navigateHistory(direction: Int) {
         if (commandHistory.isEmpty()) return
 
@@ -374,113 +451,6 @@ class TerminalFragment : Fragment() {
             commandHistory.clear()
             commandHistory.addAll(history.map { it.command }.reversed())
         }
-    }
-
-    private fun checkAudioPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun requestAudioPermission() {
-        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-    }
-
-    private fun startVoiceInput() {
-        if (!voiceManager.isAvailable()) {
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle("语音识别不可用")
-                .setMessage("您的设备不支持语音识别。\n\n请使用输入法直接输入命令。")
-                .setPositiveButton("知道了", null)
-                .show()
-            return
-        }
-
-        binding.voiceIndicator.isVisible = true
-
-        lifecycleScope.launch {
-            voiceManager.startListening().collect { result ->
-                when (result) {
-                    is VoiceResult.Partial -> binding.voiceIndicator.text = "识别中: ${result.text}"
-                    is VoiceResult.Final -> {
-                        binding.voiceIndicator.isVisible = false
-                        handleVoiceInput(result.text)
-                    }
-                    is VoiceResult.Error -> {
-                        binding.voiceIndicator.isVisible = false
-                        Toast.makeText(requireContext(), result.message, Toast.LENGTH_SHORT).show()
-                    }
-                    is VoiceResult.Ready -> binding.voiceIndicator.text = "请说话..."
-                }
-            }
-        }
-    }
-
-    private fun handleVoiceInput(text: String) {
-        val options = arrayOf("直接执行", "AI理解后执行")
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("语音输入: \"$text\"")
-            .setItems(options) { _, which ->
-                if (which == 0) {
-                    binding.etCommand.setText(text)
-                    inputText()
-                    sendEnter()
-                } else {
-                    interpretVoiceCommand(text)
-                }
-            }
-            .show()
-    }
-
-    private fun interpretVoiceCommand(text: String) {
-        val apiKey = prefsManager.getApiKey()
-        val apiEndpoint = prefsManager.getApiEndpoint() ?: AICommandInterpreter.DEFAULT_ENDPOINT
-
-        if (apiKey.isNullOrBlank()) {
-            Toast.makeText(requireContext(), "请先配置API Key", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        lifecycleScope.launch {
-            val interpreter = AICommandInterpreter(apiEndpoint, apiKey)
-            binding.voiceIndicator.isVisible = true
-            binding.voiceIndicator.text = "正在理解..."
-
-            val result = interpreter.interpret(text)
-
-            binding.voiceIndicator.isVisible = false
-
-            result.fold(
-                onSuccess = { commandResult ->
-                    if (commandResult.command.isBlank()) {
-                        Toast.makeText(requireContext(), commandResult.explanation, Toast.LENGTH_SHORT).show()
-                    } else {
-                        showCommandPreview(commandResult)
-                    }
-                },
-                onFailure = { error ->
-                    Toast.makeText(requireContext(), "理解失败: ${error.message}", Toast.LENGTH_SHORT).show()
-                }
-            )
-        }
-    }
-
-    private fun showCommandPreview(commandResult: AICommandInterpreter.CommandResult) {
-        val message = buildString {
-            append("命令: ${commandResult.command}\n\n")
-            append("说明: ${commandResult.explanation}")
-            if (commandResult.dangerous) append("\n\n⚠️ 此命令可能有风险!")
-        }
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("AI理解结果")
-            .setMessage(message)
-            .setPositiveButton("执行") { _, _ ->
-                binding.etCommand.setText(commandResult.command)
-                inputText()
-                sendEnter()
-            }
-            .setNegativeButton("取消", null)
-            .show()
     }
 
     private fun showError(title: String, message: String) {
@@ -516,6 +486,8 @@ class TerminalFragment : Fragment() {
         fun onResize(cols: Int, rows: Int) {
             terminalCols = cols
             terminalRows = rows
+            // 通知 SSH 调整 PTY 大小
+            sshManager.resizePty(cols, rows)
         }
     }
 
@@ -523,15 +495,22 @@ class TerminalFragment : Fragment() {
         super.onDestroyView()
         pendingOutput?.let { uiHandler.removeCallbacks(it) }
         flushBatch() // 刷新剩余输出
-        shellJob?.cancel()
-        sshManager.disconnect()
-        voiceManager.cancel()
+        // 注意：不要断开 SSH 连接，因为 retainInstance = true
         try {
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } catch (e: Exception) {
             // ignore
         }
         _binding = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // 只有在 Fragment 真正销毁时才断开连接
+        shellJob?.cancel()
+        if (::sshManager.isInitialized) {
+            sshManager.disconnect()
+        }
     }
 
     companion object {

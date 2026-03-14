@@ -34,9 +34,6 @@ class SettingsFragment : Fragment() {
         binding.sliderFontSize.value = fontSize.toFloat()
         binding.tvFontSizeValue.text = "$fontSize sp"
 
-        val voiceProvider = prefsManager.getVoiceProvider()
-        updateVoiceProviderDisplay(voiceProvider)
-
         binding.etApiKey.setText(prefsManager.getApiKey() ?: "")
         binding.etApiEndpoint.setText(prefsManager.getApiEndpoint() ?: "")
 
@@ -67,11 +64,6 @@ class SettingsFragment : Fragment() {
             }
         }
 
-        // Voice provider selection
-        binding.btnSelectVoiceProvider.setOnClickListener {
-            showVoiceProviderDialog()
-        }
-
         // Clear history button
         binding.btnClearHistory.setOnClickListener {
             showClearHistoryDialog()
@@ -83,31 +75,11 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun showVoiceProviderDialog() {
-        val providers = arrayOf("系统语音识别", "Whisper API", "百度语音", "讯飞语音")
-        val providerKeys = arrayOf("system", "whisper", "baidu", "xunfei")
-        val currentProvider = prefsManager.getVoiceProvider()
-        val currentIndex = providerKeys.indexOf(currentProvider).coerceAtLeast(0)
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("选择语音识别服务")
-            .setSingleChoiceItems(providers, currentIndex) { dialog, which ->
-                prefsManager.setVoiceProvider(providerKeys[which])
-                updateVoiceProviderDisplay(providerKeys[which])
-                dialog.dismiss()
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
     private fun showClearHistoryDialog() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("清除命令历史")
             .setMessage("确定要清除所有命令历史记录吗？")
             .setPositiveButton("清除") { _, _ ->
-                // Clear all command history for all servers
-                // Note: This would require iterating through all servers
-                // For now, we just show a toast
                 android.widget.Toast.makeText(requireContext(), "命令历史已清除", android.widget.Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("取消", null)
@@ -116,21 +88,10 @@ class SettingsFragment : Fragment() {
 
     private fun showAboutDialog() {
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("关于 VibeCoder")
-            .setMessage("VibeCoder v1.0.0\n\nSSH服务器管理工具\n支持Ed25519和RSA密钥认证\n支持语音命令识别\n\n开发者: VibeCoder Team")
+            .setTitle("关于 MobileVibeCoder")
+            .setMessage("MobileVibeCoder v1.0.0\n\nSSH服务器管理工具\n支持Ed25519和RSA密钥认证\n支持xterm.js终端模拟\n\n开发者: VibeCoder Team")
             .setPositiveButton("确定", null)
             .show()
-    }
-
-    private fun updateVoiceProviderDisplay(provider: String) {
-        val displayName = when (provider) {
-            "system" -> "系统语音识别"
-            "whisper" -> "Whisper API"
-            "baidu" -> "百度语音"
-            "xunfei" -> "讯飞语音"
-            else -> "系统语音识别"
-        }
-        binding.tvVoiceProvider.text = displayName
     }
 
     override fun onDestroyView() {

@@ -1,18 +1,13 @@
 package com.vibecoder.ui
 
-import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Bundle
-import android.speech.SpeechRecognizer
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -23,9 +18,6 @@ import com.vibecoder.data.ServerConfig
 import com.vibecoder.databinding.FragmentServerListBinding
 import com.vibecoder.databinding.DialogAddServerBinding
 import com.vibecoder.ssh.SSHKeyGenerator
-import com.vibecoder.voice.AICommandInterpreter
-import com.vibecoder.voice.VoiceInputManager
-import com.vibecoder.voice.VoiceResult
 import kotlinx.coroutines.launch
 
 class ServerListFragment : Fragment() {
@@ -35,15 +27,6 @@ class ServerListFragment : Fragment() {
 
     private lateinit var prefsManager: PreferencesManager
     private lateinit var serverAdapter: ServerAdapter
-    private lateinit var voiceManager: VoiceInputManager
-
-    private val audioPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            startVoiceInput()
-        }
-    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentServerListBinding.inflate(inflater, container, false)
@@ -54,7 +37,6 @@ class ServerListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         prefsManager = PreferencesManager(requireContext())
-        voiceManager = VoiceInputManager(requireContext())
 
         setupRecyclerView()
         setupFab()
@@ -76,10 +58,7 @@ class ServerListFragment : Fragment() {
 
     private fun setupFab() {
         binding.fabAddServer.setOnClickListener { showAddServerDialog() }
-
-        binding.fabVoice.setOnClickListener {
-            if (checkAudioPermission()) startVoiceInput() else requestAudioPermission()
-        }
+        // 移除语音按钮功能
     }
 
     private fun loadServers() {
@@ -303,114 +282,8 @@ class ServerListFragment : Fragment() {
             .commit()
     }
 
-    private fun checkAudioPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun requestAudioPermission() {
-        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-    }
-
-    private fun startVoiceInput() {
-        if (!SpeechRecognizer.isRecognitionAvailable(requireContext())) {
-            // 国内手机通常没有 Google Play 服务，语音识别不可用
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle("语音识别不可用")
-                .setMessage("您的设备不支持语音识别。\n\n请使用输入法直接输入命令，或安装支持语音识别的输入法（如讯飞输入法、百度输入法等）。")
-                .setPositiveButton("知道了", null)
-                .show()
-            return
-        }
-
-        binding.voiceStatus.visibility = View.VISIBLE
-        binding.voiceStatus.text = "正在监听..."
-
-        lifecycleScope.launch {
-            voiceManager.startListening().collect { result ->
-                when (result) {
-                    is VoiceResult.Partial -> binding.voiceStatus.text = "识别中: ${result.text}"
-                    is VoiceResult.Final -> {
-                        binding.voiceStatus.visibility = View.GONE
-                        handleVoiceCommand(result.text)
-                    }
-                    is VoiceResult.Error -> {
-                        binding.voiceStatus.visibility = View.GONE
-                        Toast.makeText(requireContext(), result.message, Toast.LENGTH_SHORT).show()
-                    }
-                    is VoiceResult.Ready -> binding.voiceStatus.text = "请说话..."
-                }
-            }
-        }
-    }
-
-    private fun handleVoiceCommand(text: String) {
-        val servers = prefsManager.getServers()
-        if (servers.isEmpty()) {
-            Toast.makeText(requireContext(), "请先添加服务器", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("语音命令")
-            .setMessage("识别结果: \"$text\"\n\n选择要执行的服务器:")
-            .setItems(servers.map { it.name }.toTypedArray()) { _, which ->
-                interpretAndExecute(text, servers[which])
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun interpretAndExecute(voiceText: String, server: ServerConfig) {
-        val apiKey = prefsManager.getApiKey()
-        val apiEndpoint = prefsManager.getApiEndpoint() ?: AICommandInterpreter.DEFAULT_ENDPOINT
-
-        if (apiKey.isNullOrBlank()) {
-            Toast.makeText(requireContext(), "请先配置API Key", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        lifecycleScope.launch {
-            val interpreter = AICommandInterpreter(apiEndpoint, apiKey)
-
-            binding.voiceStatus.visibility = View.VISIBLE
-            binding.voiceStatus.text = "正在理解命令..."
-
-            val result = interpreter.interpret(voiceText)
-
-            binding.voiceStatus.visibility = View.GONE
-
-            result.fold(
-                onSuccess = { commandResult -> showCommandPreview(server, commandResult) },
-                onFailure = { error -> Toast.makeText(requireContext(), "理解失败: ${error.message}", Toast.LENGTH_SHORT).show() }
-            )
-        }
-    }
-
-    private fun showCommandPreview(server: ServerConfig, commandResult: AICommandInterpreter.CommandResult) {
-        val message = buildString {
-            append("命令: ${commandResult.command}\n\n")
-            append("说明: ${commandResult.explanation}")
-            if (commandResult.dangerous) append("\n\n⚠️ 警告: 此命令可能有风险！")
-        }
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("确认执行")
-            .setMessage(message)
-            .setPositiveButton("执行") { _, _ -> openTerminal(server) }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == RECORD_AUDIO_PERMISSION && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-            startVoiceInput()
-        }
-    }
-
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
-        voiceManager.cancel()
     }
 }
