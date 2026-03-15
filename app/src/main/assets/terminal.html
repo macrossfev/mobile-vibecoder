@@ -18,9 +18,19 @@
             width: 100%;
             height: 100%;
         }
-        /* 隐藏 xterm 滚动条 */
+        /* 透明滚动条样式 */
         .xterm-viewport::-webkit-scrollbar {
-            display: none;
+            width: 8px;
+        }
+        .xterm-viewport::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .xterm-viewport::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        .xterm-viewport::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
     </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
@@ -52,8 +62,9 @@
             },
             cursorBlink: true,
             cursorStyle: 'block',
-            scrollback: 3000,
-            convertEol: true  // 将 \n 转换为 \r\n
+            scrollback: 5000,
+            convertEol: true,  // 将 \n 转换为 \r\n
+            allowScroll: true
         });
 
         const fitAddon = new FitAddon.FitAddon();
@@ -101,6 +112,50 @@
         // 获取终端尺寸
         window.getTerminalSize = function() {
             return JSON.stringify({ cols: term.cols, rows: term.rows });
+        };
+
+        // 滚动功能 - 在本地滚动缓冲区
+        window.scrollTerminalUp = function(lines) {
+            // 获取 viewport 元素并滚动
+            const viewport = document.querySelector('.xterm-viewport');
+            if (viewport) {
+                viewport.scrollTop -= (lines || 5) * 20; // 每次滚动几行
+            }
+        };
+
+        window.scrollTerminalDown = function(lines) {
+            const viewport = document.querySelector('.xterm-viewport');
+            if (viewport) {
+                viewport.scrollTop += (lines || 5) * 20;
+            }
+        };
+
+        window.scrollTerminalPageUp = function() {
+            const viewport = document.querySelector('.xterm-viewport');
+            if (viewport) {
+                viewport.scrollTop -= viewport.clientHeight * 0.8;
+            }
+        };
+
+        window.scrollTerminalPageDown = function() {
+            const viewport = document.querySelector('.xterm-viewport');
+            if (viewport) {
+                viewport.scrollTop += viewport.clientHeight * 0.8;
+            }
+        };
+
+        window.scrollTerminalToTop = function() {
+            const viewport = document.querySelector('.xterm-viewport');
+            if (viewport) {
+                viewport.scrollTop = 0;
+            }
+        };
+
+        window.scrollTerminalToBottom = function() {
+            const viewport = document.querySelector('.xterm-viewport');
+            if (viewport) {
+                viewport.scrollTop = viewport.scrollHeight;
+            }
         };
     </script>
 </body>

@@ -38,6 +38,7 @@ class SettingsFragment : Fragment() {
         binding.etApiEndpoint.setText(prefsManager.getApiEndpoint() ?: "")
 
         binding.switchKeepScreenOn.isChecked = prefsManager.isKeepScreenOn()
+        binding.switchVirtualKeyboard.isChecked = prefsManager.isVirtualKeyboardEnabled()
     }
 
     private fun setupListeners() {
@@ -49,6 +50,10 @@ class SettingsFragment : Fragment() {
 
         binding.switchKeepScreenOn.setOnCheckedChangeListener { _, isChecked ->
             prefsManager.setKeepScreenOn(isChecked)
+        }
+
+        binding.switchVirtualKeyboard.setOnCheckedChangeListener { _, isChecked ->
+            prefsManager.setVirtualKeyboardEnabled(isChecked)
         }
 
         // Save API settings when focus is lost

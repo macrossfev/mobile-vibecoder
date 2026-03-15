@@ -127,6 +127,74 @@ class PreferencesManager(context: Context) {
         )
     }
 
+    // 滑动球设置
+    fun getScrollBallAlpha(): Float = prefs.getFloat(KEY_SCROLL_BALL_ALPHA, 0.6f)
+    fun setScrollBallAlpha(alpha: Float) = prefs.edit().putFloat(KEY_SCROLL_BALL_ALPHA, alpha).apply()
+
+    fun getScrollBallPosition(): Pair<Float, Float> {
+        val x = prefs.getFloat(KEY_SCROLL_BALL_X, -1f)
+        val y = prefs.getFloat(KEY_SCROLL_BALL_Y, -1f)
+        return Pair(x, y)
+    }
+
+    fun saveScrollBallPosition(x: Float, y: Float) {
+        prefs.edit()
+            .putFloat(KEY_SCROLL_BALL_X, x)
+            .putFloat(KEY_SCROLL_BALL_Y, y)
+            .apply()
+    }
+
+    // 虚拟键盘设置
+    fun isVirtualKeyboardEnabled(): Boolean = prefs.getBoolean(KEY_VIRTUAL_KEYBOARD, false)
+    fun setVirtualKeyboardEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_VIRTUAL_KEYBOARD, enabled).apply()
+
+    // 功能键设置 (F1-F3)
+    fun getFunctionKeyModifiers(): Array<String> {
+        val json = prefs.getString(KEY_FUNCTION_KEY_MODIFIERS, null) ?: return arrayOf("Ctrl", "Ctrl", "Ctrl")
+        val type = object : TypeToken<List<String>>() {}.type
+        val list: List<String> = gson.fromJson(json, type)
+        return list.toTypedArray()
+    }
+
+    fun saveFunctionKeyModifiers(modifiers: Array<String>) {
+        prefs.edit().putString(KEY_FUNCTION_KEY_MODIFIERS, gson.toJson(modifiers.toList())).apply()
+    }
+
+    fun getFunctionKeyChars(): Array<String> {
+        val json = prefs.getString(KEY_FUNCTION_KEY_CHARS, null) ?: return arrayOf("c", "d", "z")
+        val type = object : TypeToken<List<String>>() {}.type
+        val list: List<String> = gson.fromJson(json, type)
+        return list.toTypedArray()
+    }
+
+    fun saveFunctionKeyChars(chars: Array<String>) {
+        prefs.edit().putString(KEY_FUNCTION_KEY_CHARS, gson.toJson(chars.toList())).apply()
+    }
+
+    // 快速输入设置
+    fun getQuickInputLabels(): Array<String> {
+        val json = prefs.getString(KEY_QUICK_INPUT_LABELS, null) ?: return arrayOf("快1", "快2", "快3")
+        val type = object : TypeToken<List<String>>() {}.type
+        val list: List<String> = gson.fromJson(json, type)
+        return list.toTypedArray()
+    }
+
+    fun saveQuickInputLabels(labels: Array<String>) {
+        prefs.edit().putString(KEY_QUICK_INPUT_LABELS, gson.toJson(labels.toList())).apply()
+    }
+
+    fun getQuickInputContents(): Array<String> {
+        val json = prefs.getString(KEY_QUICK_INPUT_CONTENTS, null)
+            ?: return arrayOf("tmux attach -t ", "kubectl get pods", "htop")
+        val type = object : TypeToken<List<String>>() {}.type
+        val list: List<String> = gson.fromJson(json, type)
+        return list.toTypedArray()
+    }
+
+    fun saveQuickInputContents(contents: Array<String>) {
+        prefs.edit().putString(KEY_QUICK_INPUT_CONTENTS, gson.toJson(contents.toList())).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "vibecoder_prefs"
         private const val KEY_SERVERS = "servers"
@@ -139,5 +207,13 @@ class PreferencesManager(context: Context) {
         private const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
         private const val KEY_CUSTOM_LABELS = "custom_key_labels"
         private const val KEY_CUSTOM_COMMANDS = "custom_key_commands"
+        private const val KEY_SCROLL_BALL_ALPHA = "scroll_ball_alpha"
+        private const val KEY_SCROLL_BALL_X = "scroll_ball_x"
+        private const val KEY_SCROLL_BALL_Y = "scroll_ball_y"
+        private const val KEY_VIRTUAL_KEYBOARD = "virtual_keyboard"
+        private const val KEY_FUNCTION_KEY_MODIFIERS = "function_key_modifiers"
+        private const val KEY_FUNCTION_KEY_CHARS = "function_key_chars"
+        private const val KEY_QUICK_INPUT_LABELS = "quick_input_labels"
+        private const val KEY_QUICK_INPUT_CONTENTS = "quick_input_contents"
     }
 }

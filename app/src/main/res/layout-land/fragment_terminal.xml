@@ -63,6 +63,24 @@
             app:strokeColor="#555555"
             app:strokeWidth="1dp" />
 
+        <!-- 3. Del 按钮 -->
+        <Button
+            android:id="@+id/btn_del"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:layout_marginStart="2dp"
+            android:text="Del"
+            android:textColor="#FF9800"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="36dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#FF9800"
+            app:strokeWidth="1dp" />
+
         <!-- 3. 自定义快捷键 -->
         <Button
             android:id="@+id/btn_custom1"

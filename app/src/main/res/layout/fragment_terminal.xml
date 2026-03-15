@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000">
 
     <!-- 终端输出区域 -->
     <WebView
@@ -13,13 +18,84 @@
         android:layout_height="0dp"
         android:background="#000000"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/input_area" />
+        app:layout_constraintBottom_toTopOf="@id/virtual_keyboard" />
+
+    <!-- 快速输入按钮区域 (右上角) -->
+    <LinearLayout
+        android:id="@+id/quick_input_panel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="4dp"
+        android:background="#80000000"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btn_quick_input1"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="2dp"
+            android:text="快1"
+            android:textColor="#2196F3"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="40dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#2196F3"
+            app:strokeWidth="1dp" />
+
+        <Button
+            android:id="@+id/btn_quick_input2"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="2dp"
+            android:text="快2"
+            android:textColor="#2196F3"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="40dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#2196F3"
+            app:strokeWidth="1dp" />
+
+        <Button
+            android:id="@+id/btn_quick_input3"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:text="快3"
+            android:textColor="#2196F3"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="40dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#2196F3"
+            app:strokeWidth="1dp" />
+
+    </LinearLayout>
 
     <!-- 隐藏的快捷键栏（保持兼容） -->
     <LinearLayout
         android:id="@+id/quick_keys"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/input_area" />
+
+    <!-- 虚拟键盘 -->
+    <com.vibecoder.ui.widget.VirtualKeyboardView
+        android:id="@+id/virtual_keyboard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/input_area" />
 
@@ -69,48 +145,68 @@
             app:strokeColor="#555555"
             app:strokeWidth="1dp" />
 
-        <!-- 自定义快捷键按钮 -->
+        <!-- Del 按钮 -->
         <Button
-            android:id="@+id/btn_custom1"
+            android:id="@+id/btn_del"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="28dp"
             android:layout_marginStart="2dp"
-            android:text="Ctrl+C"
+            android:text="Del"
+            android:textColor="#FF9800"
+            android:textSize="9sp"
+            android:padding="0dp"
+            android:minWidth="36dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#FF9800"
+            app:strokeWidth="1dp" />
+
+        <!-- F1 按钮 -->
+        <Button
+            android:id="@+id/btn_f1"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginStart="2dp"
+            android:text="F1"
             android:textColor="#4CAF50"
             android:textSize="9sp"
             android:padding="0dp"
-            android:minWidth="44dp"
+            android:minWidth="36dp"
             android:minHeight="0dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             app:strokeColor="#4CAF50"
             app:strokeWidth="1dp" />
 
+        <!-- F2 按钮 -->
         <Button
-            android:id="@+id/btn_custom2"
+            android:id="@+id/btn_f2"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="28dp"
             android:layout_marginStart="2dp"
-            android:text="Ctrl+D"
+            android:text="F2"
             android:textColor="#4CAF50"
             android:textSize="9sp"
             android:padding="0dp"
-            android:minWidth="44dp"
+            android:minWidth="36dp"
             android:minHeight="0dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             app:strokeColor="#4CAF50"
             app:strokeWidth="1dp" />
 
+        <!-- F3 按钮 -->
         <Button
-            android:id="@+id/btn_custom3"
+            android:id="@+id/btn_f3"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="28dp"
             android:layout_marginStart="2dp"
-            android:text="Tab"
+            android:text="F3"
             android:textColor="#4CAF50"
             android:textSize="9sp"
             android:padding="0dp"
@@ -237,4 +333,62 @@
 
     </LinearLayout>
 
+    <!-- 滚动按钮区域 (右侧) -->
+    <LinearLayout
+        android:id="@+id/scroll_buttons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="4dp"
+        android:background="#80000000"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btn_scroll_up"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:text="↑"
+            android:textColor="#2196F3"
+            android:textSize="18sp"
+            android:padding="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#2196F3"
+            app:strokeWidth="1dp" />
+
+        <Button
+            android:id="@+id/btn_scroll_down"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:text="↓"
+            android:textColor="#FF9800"
+            android:textSize="18sp"
+            android:padding="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:strokeColor="#FF9800"
+            app:strokeWidth="1dp" />
+
+    </LinearLayout>
+
+    <!-- 滑动球（保留兼容，默认隐藏） -->
+    <com.vibecoder.ui.widget.ScrollBallView
+        android:id="@+id/scroll_ball"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="16dp" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
+
+</FrameLayout>

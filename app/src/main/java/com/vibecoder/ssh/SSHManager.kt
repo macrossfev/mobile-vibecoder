@@ -49,12 +49,16 @@ class SSHManager {
 
                 setConfig("StrictHostKeyChecking", "no")
                 setConfig("UserKnownHostsFile", "no")
+                // 增强保活设置 - 尽可能长时间保持连接
                 setConfig("KeepAlive", "yes")
-                setConfig("ServerAliveInterval", "30")
-                setConfig("ServerAliveCountMax", "3")
+                setConfig("ServerAliveInterval", "10")   // 每10秒发送心跳
+                setConfig("ServerAliveCountMax", "1000") // 1000次无响应才断开（约2.7小时）
+                setConfig("TCPKeepAlive", "yes")
 
-                timeout = 30000
+                timeout = 60000  // 连接超时60秒
             }
+
+            Log.d(TAG, "Connecting to ${config.host}:${config.port}")
 
             session?.connect(30000)
 
@@ -252,12 +256,20 @@ class SSHManager {
     /**
      * 检查连接状态
      */
-    fun isConnected(): Boolean = session?.isConnected == true
+    fun isConnected(): Boolean {
+        val connected = session?.isConnected == true
+        Log.d(TAG, "isConnected check: $connected (session: ${session != null}, isConnected: ${session?.isConnected})")
+        return connected
+    }
 
     /**
      * 检查 Shell 是否就绪
      */
-    fun isShellReady(): Boolean = outputStream != null && shellChannel?.isConnected == true
+    fun isShellReady(): Boolean {
+        val ready = outputStream != null && shellChannel?.isConnected == true
+        Log.d(TAG, "isShellReady check: $ready (outputStream: ${outputStream != null}, shellChannel: ${shellChannel?.isConnected})")
+        return ready
+    }
 
     /**
      * 调整 PTY 大小（横竖屏切换时调用）
