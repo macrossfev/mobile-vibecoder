@@ -19,7 +19,9 @@ data class ServerConfig(
     val color: String = "#4CAF50",
     // Tmux 设置
     val useTmux: Boolean = false,
-    val tmuxSession: String = "main"
+    val tmuxSession: String = "main",
+    // 连接后自动执行的命令
+    val initCommand: String = ""
 ) : Serializable {
 
     fun getDisplayAddress(): String {

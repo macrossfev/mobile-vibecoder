@@ -24,7 +24,6 @@ import com.vibecoder.data.PreferencesManager
 import com.vibecoder.data.ServerConfig
 import com.vibecoder.databinding.FragmentTerminalBinding
 import com.vibecoder.ssh.SSHManager
-import com.vibecoder.ui.widget.ScrollBallView
 import com.vibecoder.ui.widget.VirtualKeyboardView
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -64,14 +63,6 @@ class TerminalFragment : Fragment() {
     private var lastFlushTime = 0L
     private val FLUSH_INTERVAL = 50L
 
-    // 快速输入设置 (3个可自定义)
-    private var quickInputLabels = arrayOf("快1", "快2", "快3")
-    private var quickInputContents = arrayOf("docker ps -a", "kubectl get pods", "htop")
-
-    // 功能键设置 (F1-F3 可自定义组合键)
-    private var functionKeyModifiers = arrayOf("", "", "")  // Ctrl, Shift, Alt
-    private var functionKeyChars = arrayOf("c", "d", "z")   // 字母或数字
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val serverJson = arguments?.getString(ARG_SERVER_JSON)
@@ -101,8 +92,8 @@ class TerminalFragment : Fragment() {
         }
 
         if (!::sshManager.isInitialized) {
-            Log.d(TAG, "Creating new SSHManager instance")
-            sshManager = SSHManager()
+            Log.d(TAG, "Getting SSHManager singleton instance")
+            sshManager = SSHManager.getInstance()
         } else {
             Log.d(TAG, "Reusing existing SSHManager - connected: ${sshManager.isConnected()}, shellReady: ${sshManager.isShellReady()}")
         }
@@ -115,8 +106,6 @@ class TerminalFragment : Fragment() {
         setupInput()
         setupDirectionKeys()
         setupFunctionKeys()
-        setupQuickInput()
-        setupScrollButtons()
         setupVirtualKeyboard()
 
         // 检查连接状态
@@ -201,258 +190,303 @@ class TerminalFragment : Fragment() {
         binding.btnLeft.setOnClickListener { sendArrowKey("left") }
         binding.btnRight.setOnClickListener { sendArrowKey("right") }
 
-        binding.btnEsc.setOnClickListener { sendEsc() }
-        binding.btnDel.setOnClickListener { sendDel() }
+        // 长按方向键连续发送
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        var upRepeat: Runnable? = null
+        var downRepeat: Runnable? = null
+        var leftRepeat: Runnable? = null
+        var rightRepeat: Runnable? = null
+
+        binding.btnUp.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    sendArrowKey("up")
+                    upRepeat = object : Runnable {
+                        override fun run() {
+                            sendArrowKey("up")
+                            handler.postDelayed(this, 80)
+                        }
+                    }
+                    handler.postDelayed(upRepeat!!, 400)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    upRepeat?.let { handler.removeCallbacks(it) }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        binding.btnDown.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    sendArrowKey("down")
+                    downRepeat = object : Runnable {
+                        override fun run() {
+                            sendArrowKey("down")
+                            handler.postDelayed(this, 80)
+                        }
+                    }
+                    handler.postDelayed(downRepeat!!, 400)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    downRepeat?.let { handler.removeCallbacks(it) }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        binding.btnLeft.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    sendArrowKey("left")
+                    leftRepeat = object : Runnable {
+                        override fun run() {
+                            sendArrowKey("left")
+                            handler.postDelayed(this, 80)
+                        }
+                    }
+                    handler.postDelayed(leftRepeat!!, 400)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    leftRepeat?.let { handler.removeCallbacks(it) }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        binding.btnRight.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    sendArrowKey("right")
+                    rightRepeat = object : Runnable {
+                        override fun run() {
+                            sendArrowKey("right")
+                            handler.postDelayed(this, 80)
+                        }
+                    }
+                    handler.postDelayed(rightRepeat!!, 400)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    rightRepeat?.let { handler.removeCallbacks(it) }
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun setupFunctionKeys() {
-        // 加载设置
-        loadFunctionKeys()
+        // 查看按钮: 进入tmux copy mode
+        binding.btnView.setOnClickListener { tmuxEnterCopyMode() }
 
-        // F1-F3 功能键
-        binding.btnF1?.setOnClickListener { sendFunctionKey(0) }
-        binding.btnF2?.setOnClickListener { sendFunctionKey(1) }
-        binding.btnF3?.setOnClickListener { sendFunctionKey(2) }
+        // Esc键
+        binding.btnEsc.setOnClickListener { sendEsc() }
 
-        // 长按编辑功能键
-        binding.btnF1?.setOnLongClickListener { editFunctionKey(0); true }
-        binding.btnF2?.setOnLongClickListener { editFunctionKey(1); true }
-        binding.btnF3?.setOnLongClickListener { editFunctionKey(2); true }
+        // 自定义快捷键 (支持三键组合)
+        binding.btnCustom.setOnClickListener { sendCustomShortcut() }
+        binding.btnCustom.setOnLongClickListener { editCustomShortcut(); true }
+
+        // 快捷命令按钮: 点击直接执行保存的命令，长按设置
+        binding.btnQuickCommand.setOnClickListener { executeQuickCommand() }
+        binding.btnQuickCommand.setOnLongClickListener { editQuickCommand(); true }
+
+        // 更新按钮文本
+        updateCustomShortcutButton()
+        updateQuickCommandButton()
     }
 
-    private fun setupQuickInput() {
-        // 加载设置
-        loadQuickInput()
-
-        // 快速输入按钮
-        binding.btnQuickInput1?.setOnClickListener { insertQuickInput(0) }
-        binding.btnQuickInput2?.setOnClickListener { insertQuickInput(1) }
-        binding.btnQuickInput3?.setOnClickListener { insertQuickInput(2) }
-
-        // 长按编辑快速输入
-        binding.btnQuickInput1?.setOnLongClickListener { editQuickInput(0); true }
-        binding.btnQuickInput2?.setOnLongClickListener { editQuickInput(1); true }
-        binding.btnQuickInput3?.setOnLongClickListener { editQuickInput(2); true }
-
-        // 设置按钮文本
-        binding.btnQuickInput1?.text = quickInputLabels[0]
-        binding.btnQuickInput2?.text = quickInputLabels[1]
-        binding.btnQuickInput3?.text = quickInputLabels[2]
-    }
-
-    private fun loadFunctionKeys() {
-        val modifiers = prefsManager.getFunctionKeyModifiers()
-        val chars = prefsManager.getFunctionKeyChars()
-        if (modifiers.isNotEmpty()) functionKeyModifiers = modifiers
-        if (chars.isNotEmpty()) functionKeyChars = chars
-        updateFunctionKeyLabels()
-    }
-
-    private fun saveFunctionKeys() {
-        prefsManager.saveFunctionKeyModifiers(functionKeyModifiers)
-        prefsManager.saveFunctionKeyChars(functionKeyChars)
-    }
-
-    private fun loadQuickInput() {
-        val labels = prefsManager.getQuickInputLabels()
-        val contents = prefsManager.getQuickInputContents()
-        if (labels.isNotEmpty()) quickInputLabels = labels
-        if (contents.isNotEmpty()) quickInputContents = contents
-    }
-
-    private fun saveQuickInput() {
-        prefsManager.saveQuickInputLabels(quickInputLabels)
-        prefsManager.saveQuickInputContents(quickInputContents)
-    }
-
-    private fun updateFunctionKeyLabels() {
-        binding.btnF1?.text = getFunctionKeyLabel(0)
-        binding.btnF2?.text = getFunctionKeyLabel(1)
-        binding.btnF3?.text = getFunctionKeyLabel(2)
-    }
-
-    private fun getFunctionKeyLabel(index: Int): String {
-        val modifier = functionKeyModifiers.getOrNull(index) ?: ""
-        val char = functionKeyChars.getOrNull(index) ?: ""
-        return if (modifier.isNotEmpty()) "$modifier+$char" else char.uppercase()
-    }
-
-    private fun sendFunctionKey(index: Int) {
-        if (!sshManager.isShellReady()) return
-        val modifier = functionKeyModifiers.getOrNull(index) ?: ""
-        val char = functionKeyChars.getOrNull(index)?.lowercase() ?: return
-
-        val sequence = when {
-            modifier == "Ctrl" && char.length == 1 && char[0].isLetter() -> {
-                (char[0].code - 'a'.code + 1).toChar().toString()
-            }
-            modifier == "Alt" && char.length == 1 -> {
-                "\u001B$char"
-            }
-            modifier == "Shift" && char.length == 1 -> {
-                char.uppercase()
-            }
-            else -> char
+    private fun executeQuickCommand() {
+        val command = prefsManager.getQuickCommand()
+        if (command.isNullOrBlank()) {
+            // 没有设置命令，提示用户长按设置
+            Toast.makeText(requireContext(), "长按设置快捷命令", Toast.LENGTH_SHORT).show()
+        } else {
+            executeCommand(command)
         }
+    }
+
+    private fun editQuickCommand(): Boolean {
+        val current = prefsManager.getQuickCommand() ?: ""
+
+        val input = android.widget.EditText(requireContext()).apply {
+            setText(current)
+            setSingleLine()
+            hint = "输入命令"
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("设置快捷命令")
+            .setView(input)
+            .setPositiveButton("保存") { _, _ ->
+                val command = input.text.toString().trim()
+                prefsManager.saveQuickCommand(command)
+                updateQuickCommandButton()
+                Toast.makeText(requireContext(), "已保存", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+        return true
+    }
+
+    private fun updateQuickCommandButton() {
+        val command = prefsManager.getQuickCommand()
+        if (!command.isNullOrBlank()) {
+            // 显示简短命令名
+            val display = if (command.length > 6) command.take(6) + ".." else command
+            binding.btnQuickCommand.text = display
+        } else {
+            binding.btnQuickCommand.text = "快捷命令"
+        }
+    }
+
+    private fun sendCustomShortcut() {
+        val shortcut = prefsManager.getCustomShortcut() ?: "Ctrl+C"
+        sendShortcut(shortcut)
+    }
+
+    private fun sendShortcut(shortcut: String) {
+        if (!sshManager.isShellReady()) return
+
+        val parts = shortcut.split("+")
+        val key = parts.last().lowercase()
+        val hasCtrl = parts.any { it.equals("Ctrl", ignoreCase = true) }
+        val hasAlt = parts.any { it.equals("Alt", ignoreCase = true) }
+        val hasShift = parts.any { it.equals("Shift", ignoreCase = true) }
 
         lifecycleScope.launch {
-            sshManager.writeToShellAsync(sequence)
+            if (key == "esc") {
+                sshManager.writeToShellAsync("\u001B")
+            } else if (key == "del") {
+                sshManager.writeToShellAsync("\u007F")
+            } else if (key == "tab") {
+                sshManager.writeToShellAsync("\t")
+            } else if (key == "enter") {
+                sshManager.writeToShellAsync("\r")
+            } else if (key.length == 1 && key[0].isLetter()) {
+                val code = key[0].lowercaseChar()
+                if (hasCtrl) {
+                    sshManager.writeToShellAsync((code.code - 'a'.code + 1).toChar().toString())
+                } else if (hasAlt) {
+                    sshManager.writeToShellAsync("\u001B$code")
+                } else {
+                    sshManager.writeToShellAsync(if (hasShift) code.uppercaseChar().toString() else code.toString())
+                }
+            } else if (key.length == 1 && key[0].isDigit()) {
+                sshManager.writeToShellAsync(key)
+            }
         }
     }
 
-    private fun editFunctionKey(index: Int) {
-        // 第一步：选择修饰键
-        val modifiers = arrayOf("无", "Ctrl", "Alt", "Shift")
-        val currentModifier = functionKeyModifiers.getOrNull(index) ?: ""
-        val modifierIndex = modifiers.indexOf(currentModifier).coerceAtLeast(0)
+    private fun editCustomShortcut() {
+        val current = prefsManager.getCustomShortcut() ?: "Ctrl+C"
+
+        // 预设选项
+        val presetOptions = arrayOf(
+            "Ctrl+C", "Ctrl+D", "Ctrl+Z", "Ctrl+A", "Ctrl+E",
+            "Ctrl+L", "Ctrl+R", "Ctrl+W", "Ctrl+K", "Ctrl+U",
+            "Alt+B", "Alt+F", "Ctrl+Shift+C", "Ctrl+Shift+V"
+        )
 
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("F${index + 1} - 选择修饰键")
-            .setSingleChoiceItems(modifiers, modifierIndex) { dialog1, whichModifier ->
-                functionKeyModifiers[index] = if (whichModifier == 0) "" else modifiers[whichModifier]
-                dialog1.dismiss()
-
-                // 第二步：选择字母或数字
-                showCharSelectionDialog(index)
+            .setTitle("选择快捷键组合")
+            .setItems(presetOptions) { _, which ->
+                prefsManager.saveCustomShortcut(presetOptions[which])
+                updateCustomShortcutButton()
             }
-            .setNegativeButton("取消", null)
+            .setNeutralButton("自定义") { _, _ ->
+                showCustomShortcutDialog()
+            }
             .show()
     }
 
-    private fun showCharSelectionDialog(index: Int) {
-        val chars = ('a'..'z').map { it.toString() } + ('0'..'9').map { it.toString() }
-        val charArray = chars.toTypedArray()
-        val currentChar = functionKeyChars.getOrNull(index) ?: "c"
-        val charIndex = charArray.indexOf(currentChar).coerceAtLeast(0)
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("F${index + 1} - 选择按键")
-            .setSingleChoiceItems(charArray, charIndex) { dialog2, whichChar ->
-                functionKeyChars[index] = charArray[whichChar]
-                saveFunctionKeys()
-                updateFunctionKeyLabels()
-                dialog2.dismiss()
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun insertQuickInput(index: Int) {
-        val content = quickInputContents.getOrNull(index) ?: return
-        val currentText = binding.etCommand.text.toString()
-        binding.etCommand.setText(currentText + content)
-        binding.etCommand.setSelection(binding.etCommand.text?.length ?: 0)
-    }
-
-    private fun editQuickInput(index: Int) {
-        val dialogView = android.view.LayoutInflater.from(requireContext())
+    private fun showCustomShortcutDialog() {
+        val view = android.view.LayoutInflater.from(requireContext())
             .inflate(android.R.layout.two_line_list_item, null)
-        val labelInput = android.widget.EditText(requireContext()).apply {
-            hint = "标签名称"
-            setText(quickInputLabels[index])
+
+        val modifiersLayout = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            setPadding(16, 8, 16, 8)
         }
-        val contentInput = android.widget.EditText(requireContext()).apply {
-            hint = "输入内容"
-            setText(quickInputContents[index])
+
+        val ctrlCb = android.widget.CheckBox(requireContext()).apply { text = "Ctrl" }
+        val altCb = android.widget.CheckBox(requireContext()).apply { text = "Alt" }
+        val shiftCb = android.widget.CheckBox(requireContext()).apply { text = "Shift" }
+
+        modifiersLayout.addView(ctrlCb)
+        modifiersLayout.addView(altCb)
+        modifiersLayout.addView(shiftCb)
+
+        val keyInput = android.widget.EditText(requireContext()).apply {
+            hint = "按键 (如: C, D, Tab, Enter)"
+            setSingleLine()
         }
+
         val layout = android.widget.LinearLayout(requireContext()).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             setPadding(32, 16, 32, 16)
-            addView(labelInput)
-            addView(contentInput)
+            addView(modifiersLayout)
+            addView(keyInput)
         }
 
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("编辑快速输入 ${index + 1}")
+            .setTitle("自定义快捷键")
             .setView(layout)
             .setPositiveButton("保存") { _, _ ->
-                quickInputLabels[index] = labelInput.text.toString().ifBlank { "快${index + 1}" }
-                quickInputContents[index] = contentInput.text.toString()
-                saveQuickInput()
-                // 更新按钮文本
-                when (index) {
-                    0 -> binding.btnQuickInput1?.text = quickInputLabels[0]
-                    1 -> binding.btnQuickInput2?.text = quickInputLabels[1]
-                    2 -> binding.btnQuickInput3?.text = quickInputLabels[2]
+                val modifiers = mutableListOf<String>()
+                if (ctrlCb.isChecked) modifiers.add("Ctrl")
+                if (altCb.isChecked) modifiers.add("Alt")
+                if (shiftCb.isChecked) modifiers.add("Shift")
+                modifiers.add(keyInput.text.toString().trim().uppercase())
+
+                val shortcut = modifiers.joinToString("+")
+                if (shortcut.isNotBlank()) {
+                    prefsManager.saveCustomShortcut(shortcut)
+                    updateCustomShortcutButton()
                 }
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    private fun setupScrollButtons() {
-        binding.btnScrollUp?.setOnClickListener { scrollTerminalUp() }
-        binding.btnScrollDown?.setOnClickListener { scrollTerminalDown() }
+    private fun updateCustomShortcutButton() {
+        val shortcut = prefsManager.getCustomShortcut() ?: "Ctrl+C"
+        // 显示简短版本
+        binding.btnCustom.text = if (shortcut.length > 8) shortcut.take(8) + ".." else shortcut
+    }
 
-        // 长按连续滚动
-        var scrollUpRepeat: Runnable? = null
-        var scrollDownRepeat: Runnable? = null
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-
-        binding.btnScrollUp?.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    scrollTerminalUp()
-                    scrollUpRepeat = object : Runnable {
-                        override fun run() {
-                            scrollTerminalUp()
-                            handler.postDelayed(this, 100)
-                        }
-                    }
-                    handler.postDelayed(scrollUpRepeat!!, 400)
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    scrollUpRepeat?.let { handler.removeCallbacks(it) }
-                    true
-                }
-                else -> false
-            }
-        }
-
-        binding.btnScrollDown?.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    scrollTerminalDown()
-                    scrollDownRepeat = object : Runnable {
-                        override fun run() {
-                            scrollTerminalDown()
-                            handler.postDelayed(this, 100)
-                        }
-                    }
-                    handler.postDelayed(scrollDownRepeat!!, 400)
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    scrollDownRepeat?.let { handler.removeCallbacks(it) }
-                    true
-                }
-                else -> false
-            }
+    private fun openVoiceMode() {
+        server?.let { srv ->
+            val fragment = VoiceTerminalFragment.newInstance(srv)
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit()
         }
     }
 
-    private fun scrollTerminalUp() {
-        activity?.runOnUiThread {
-            binding.terminalView.evaluateJavascript("scrollTerminalUp(3)", null)
+    // tmux 操作
+    private var inTmuxCopyMode = false
+
+    private fun tmuxEnterCopyMode() {
+        if (!sshManager.isShellReady()) return
+        lifecycleScope.launch {
+            sshManager.writeToShellAsync("\u0002[")  // Ctrl+B [
+            inTmuxCopyMode = true
         }
     }
 
-    private fun scrollTerminalDown() {
-        activity?.runOnUiThread {
-            binding.terminalView.evaluateJavascript("scrollTerminalDown(3)", null)
-        }
-    }
-
-    private fun scrollTerminalPageUp() {
-        activity?.runOnUiThread {
-            binding.terminalView.evaluateJavascript("scrollTerminalPageUp()", null)
-        }
-    }
-
-    private fun scrollTerminalPageDown() {
-        activity?.runOnUiThread {
-            binding.terminalView.evaluateJavascript("scrollTerminalPageDown()", null)
+    private fun tmuxExitCopyMode() {
+        if (!sshManager.isShellReady()) return
+        lifecycleScope.launch {
+            sshManager.writeToShellAsync("q")
+            inTmuxCopyMode = false
         }
     }
 
@@ -504,6 +538,16 @@ class TerminalFragment : Fragment() {
         lifecycleScope.launch {
             sshManager.writeToShellAsync(command)
             binding.etCommand.text?.clear()
+        }
+    }
+
+    private fun executeCommand(command: String) {
+        if (!sshManager.isShellReady()) {
+            Toast.makeText(requireContext(), "Shell未就绪", Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            sshManager.writeToShellAsync(command + "\n")
         }
     }
 
@@ -649,6 +693,14 @@ class TerminalFragment : Fragment() {
         }
     }
 
+    private fun executeInitCommand(command: String) {
+        if (command.isBlank()) return
+        Log.d(TAG, "Executing init command: $command")
+        lifecycleScope.launch {
+            sshManager.writeToShellAsync(command + "\n")
+        }
+    }
+
     // 批量输出到终端（减少 UI 线程压力）
     private fun appendOutput(text: String) {
         synchronized(batchBuffer) {
@@ -757,6 +809,14 @@ class TerminalFragment : Fragment() {
                 // attachTmuxSession 内部会检测是否已在tmux中，避免重复附加
                 server?.let { srv ->
                     Log.d(TAG, "Server config: useTmux=${srv.useTmux}, tmuxSession=${srv.tmuxSession}, shellReady=${sshManager.isShellReady()}")
+
+                    // 执行初始命令
+                    if (srv.initCommand.isNotBlank() && sshManager.isShellReady()) {
+                        uiHandler.postDelayed({
+                            executeInitCommand(srv.initCommand)
+                        }, 500)
+                    }
+
                     if (srv.useTmux && sshManager.isShellReady()) {
                         Log.d(TAG, "Conditions met, attaching tmux session")
                         // 延迟一小段时间确保终端完全就绪

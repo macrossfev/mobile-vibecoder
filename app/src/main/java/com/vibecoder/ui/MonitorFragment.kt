@@ -24,7 +24,7 @@ class MonitorFragment : Fragment() {
     private val binding get() = _binding!!
 
     private var server: ServerConfig? = null
-    private val sshManager = SSHManager()
+    private val sshManager = SSHManager.getInstance()
     private var monitorJob: Job? = null
 
     private val cpuHistory = mutableListOf<Float>()

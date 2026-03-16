@@ -157,6 +157,33 @@
                 viewport.scrollTop = viewport.scrollHeight;
             }
         };
+
+        // tmux 模式滚动 - 发送按键序列
+        window.tmuxScrollUp = function() {
+            // 发送 Ctrl+B [ 进入 copy mode，然后 k 向上
+            term.write('\x02[k');  // Ctrl+B [ k
+        };
+
+        window.tmuxScrollDown = function() {
+            term.write('\x02[j');  // Ctrl+B [ j
+        };
+
+        window.tmuxPageUp = function() {
+            // Ctrl+B [ 然后 Ctrl+U (半页) 或 Ctrl+B (整页)
+            term.write('\x02[\x15');  // Ctrl+B [ Ctrl+U
+        };
+
+        window.tmuxPageDown = function() {
+            term.write('\x02[\x04');  // Ctrl+B [ Ctrl+D
+        };
+
+        window.tmuxEnterCopyMode = function() {
+            term.write('\x02[');  // Ctrl+B [
+        };
+
+        window.tmuxExitCopyMode = function() {
+            term.write('q');  // q 退出 copy mode
+        };
     </script>
 </body>
 </html>

@@ -17,7 +17,8 @@ import com.vibecoder.data.PreferencesManager
 import com.vibecoder.data.ServerConfig
 import com.vibecoder.databinding.FragmentServerListBinding
 import com.vibecoder.databinding.DialogAddServerBinding
-import com.vibecoder.ssh.SSHKeyGenerator
+import com.vibecoder.ssh.SSHManager
+import com.vibecoder.ssh.SSHManager.Companion.KeyType
 import kotlinx.coroutines.launch
 
 class ServerListFragment : Fragment() {
@@ -130,6 +131,7 @@ class ServerListFragment : Fragment() {
                 val isKeyAuth = dialogBinding.rbKey.isChecked
                 val useTmux = dialogBinding.switchUseTmux.isChecked
                 val tmuxSession = dialogBinding.etTmuxSession.text.toString().ifBlank { "main" }
+                val initCommand = dialogBinding.etInitCommand.text.toString().ifBlank { "" }
                 val server = ServerConfig(
                     name = dialogBinding.etName.text.toString(),
                     host = dialogBinding.etHost.text.toString(),
@@ -139,7 +141,8 @@ class ServerListFragment : Fragment() {
                     privateKey = if (isKeyAuth) dialogBinding.etPrivateKey.text.toString().ifBlank { null } else null,
                     passphrase = if (isKeyAuth) dialogBinding.etPassphrase.text.toString().ifBlank { null } else null,
                     useTmux = useTmux,
-                    tmuxSession = tmuxSession
+                    tmuxSession = tmuxSession,
+                    initCommand = initCommand
                 )
                 prefsManager.addServer(server)
                 loadServers()
@@ -149,22 +152,22 @@ class ServerListFragment : Fragment() {
     }
 
     private fun showKeyGenerationDialog(dialogBinding: DialogAddServerBinding) {
-        val keyTypes = SSHKeyGenerator.getSupportedKeyTypes().map { it.displayName }.toTypedArray()
+        val keyTypes = SSHManager.getSupportedKeyTypes().map { it.displayName }.toTypedArray()
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("选择密钥类型")
             .setItems(keyTypes) { _, which ->
-                val selectedType = SSHKeyGenerator.getSupportedKeyTypes()[which]
+                val selectedType = SSHManager.getSupportedKeyTypes()[which]
                 generateKeyPair(selectedType, dialogBinding)
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    private fun generateKeyPair(keyType: SSHKeyGenerator.KeyType, dialogBinding: DialogAddServerBinding) {
+    private fun generateKeyPair(keyType: KeyType, dialogBinding: DialogAddServerBinding) {
         lifecycleScope.launch {
             try {
-                val keyPair = SSHKeyGenerator.generateKeyPair(keyType)
+                val keyPair = SSHManager.generateKeyPair(keyType)
 
                 // 填充私钥
                 dialogBinding.etPrivateKey.setText(keyPair.privateKey)
@@ -226,6 +229,9 @@ class ServerListFragment : Fragment() {
             tilTmuxSession.visibility = if (server.useTmux) View.VISIBLE else View.GONE
             tvTmuxHint.visibility = if (server.useTmux) View.VISIBLE else View.GONE
 
+            // 初始命令
+            etInitCommand.setText(server.initCommand)
+
             // 设置认证方式切换
             rgAuthType.setOnCheckedChangeListener { _, checkedId ->
                 when (checkedId) {
@@ -254,6 +260,7 @@ class ServerListFragment : Fragment() {
                 val isKeyAuth = dialogBinding.rbKey.isChecked
                 val useTmux = dialogBinding.switchUseTmux.isChecked
                 val tmuxSession = dialogBinding.etTmuxSession.text.toString().ifBlank { "main" }
+                val initCommand = dialogBinding.etInitCommand.text.toString().ifBlank { "" }
                 val updated = server.copy(
                     name = dialogBinding.etName.text.toString(),
                     host = dialogBinding.etHost.text.toString(),
@@ -263,7 +270,8 @@ class ServerListFragment : Fragment() {
                     privateKey = if (isKeyAuth) dialogBinding.etPrivateKey.text.toString().ifBlank { null } else null,
                     passphrase = if (isKeyAuth) dialogBinding.etPassphrase.text.toString().ifBlank { null } else null,
                     useTmux = useTmux,
-                    tmuxSession = tmuxSession
+                    tmuxSession = tmuxSession,
+                    initCommand = initCommand
                 )
                 prefsManager.updateServer(updated)
                 loadServers()

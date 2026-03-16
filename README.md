@@ -1,6 +1,6 @@
 # MobileVibeCoder
 
-一款 Android 平台的 SSH 服务器管理工具，提供终端模拟、服务器监控和远程命令执行功能。
+一款 Android 平台的 SSH 服务器管理工具，提供终端模拟、服务器监控和语音控制功能。
 
 ## 功能特性
 
@@ -8,14 +8,21 @@
 - 支持密码认证和密钥认证
 - 支持 Ed25519、RSA 2048、RSA 4096 密钥生成
 - 服务器配置的增删改查
+- **连接持久化**：屏幕旋转、切屏、短时间息屏不中断连接
 
 ### 终端模拟
 - 基于 xterm.js 的终端渲染
-- 支持方向键、Tab、Esc、Ctrl+C、Ctrl+D
-- 自定义快捷键 (F1-F8)
+- **L型透明按键布局**：方向键、查看键
+- **自定义快捷命令**：点击执行，长按编辑保存
+- **自定义快捷键**：支持多键组合（最多3键，如 Ctrl+Alt+Delete）
+- Esc 键、回车键
 - 命令历史记录
-- 滑动球手势滚动（顺时针/逆时针画圈）
-- 快速输入按钮
+
+### 语音终端
+- 语音输入命令
+- 语音输出反馈
+- 自动过滤 Claude Code 工具调用，只朗读文字内容
+- 工作状态检测和指示
 
 ### 服务器监控
 - 实时 CPU、内存、磁盘使用率
@@ -40,7 +47,6 @@
 | SSH库 | JSch 0.2.18 (mwiede fork) |
 | 加密库 | Bouncy Castle 1.77 |
 | 协程 | Kotlinx Coroutines 1.7.3 |
-| 网络 | OkHttp 4.12.0 |
 | JSON | Gson 2.10.1 |
 | 导航 | AndroidX Navigation 2.7.6 |
 | UI组件 | Material Design 3 |
@@ -64,9 +70,6 @@ cd mobile-vibecoder
 
 # Release 构建
 ./gradlew assembleRelease
-
-# 清理构建
-./gradlew clean
 ```
 
 ### 权限说明
@@ -76,7 +79,7 @@ cd mobile-vibecoder
 | INTERNET | SSH 网络连接 |
 | ACCESS_NETWORK_STATE | 网络状态检测 |
 | WAKE_LOCK | 长时间操作保持唤醒 |
-| VIBRATE | 通知振动反馈 |
+| RECORD_AUDIO | 语音输入 |
 
 ## 使用说明
 
@@ -93,11 +96,17 @@ cd mobile-vibecoder
 
 ### 终端操作
 
-- **方向键**：用于命令历史导航和光标移动
-- **快捷键**：F1-F3，长按可自定义功能（F1-F8, Ctrl+C/D/Z, Tab）
-- **快速输入**：点击快1/快2/快3按钮插入预设命令，长按可编辑
-- **滑动球**：拖动定位，顺时针画圈向下滚动，逆时针向上滚动，长按调整透明度
-- **Esc/Del**：发送 Esc 键和删除键
+- **方向键**：↑↓←→ 用于导航和光标移动
+- **查看键**：快速查看终端内容
+- **快捷命令**：点击执行已保存的命令，长按编辑
+- **自定义快捷键**：长按配置组合键，点击发送
+- **Esc/回车**：发送 Esc 键和回车键
+
+### 语音终端
+
+1. 从服务器列表选择服务器，点击进入语音终端
+2. 按住麦克风按钮说话，松开后自动识别
+3. 开启语音输出后，终端内容会被朗读
 
 ### 服务器监控
 
@@ -111,10 +120,9 @@ cd mobile-vibecoder
 
 ### 密钥管理
 
-1. 进入 **设置** 页面
-2. 点击 **生成密钥对**
-3. 选择密钥类型：Ed25519（推荐）、RSA 2048、RSA 4096
-4. 生成的公钥可复制到服务器的 `~/.ssh/authorized_keys`
+1. 添加服务器时点击 **生成密钥对**
+2. 选择密钥类型：Ed25519（推荐）、RSA 2048、RSA 4096
+3. 生成的公钥可复制到服务器的 `~/.ssh/authorized_keys`
 
 ## 项目结构
 
@@ -125,41 +133,41 @@ app/src/main/java/com/vibecoder/
 │   ├── Models.kt                # 数据模型
 │   └── PreferencesManager.kt    # 数据存储
 ├── ssh/
-│   ├── SSHManager.kt            # SSH 连接管理
-│   └── SSHKeyGenerator.kt       # 密钥生成器
+│   └── SSHManager.kt            # SSH 连接管理 + 密钥生成
 ├── ui/
 │   ├── MainActivity.kt          # 主 Activity
 │   ├── ServerListFragment.kt    # 服务器列表
 │   ├── ServerAdapter.kt         # 列表适配器
 │   ├── TerminalFragment.kt      # 终端页面
+│   ├── VoiceTerminalFragment.kt # 语音终端
 │   ├── MonitorFragment.kt       # 监控页面
-│   └── SettingsFragment.kt      # 设置页面
+│   ├── SettingsFragment.kt      # 设置页面
+│   └── widget/
+│       └── VirtualKeyboardView.kt # 虚拟键盘
 └── voice/
-    ├── VoiceInputManager.kt     # 语音输入管理
-    └── AICommandInterpreter.kt  # AI 命令解释器
-```
-
-## 依赖库
-
-### JSch (mwiede fork)
-原版 JSch 已停止维护，使用社区维护的 mwiede 版本，支持 Ed25519 等现代加密算法。
-
-```gradle
-implementation 'com.github.mwiede:jsch:0.2.18'
-```
-
-### Bouncy Castle
-用于加密操作，支持 Ed25519 密钥生成。
-
-```gradle
-implementation 'org.bouncycastle:bcprov-jdk18on:1.77'
+    └── VoiceInputManager.kt     # 语音输入管理
 ```
 
 ## 版本历史
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| v1.1.0 | 2026-03-16 | 语音终端、连接持久化、UI重构、代码精简 |
 | v1.0.0 | 2026-03-14 | 初始发布版本 |
+
+### v1.1.0 更新内容
+
+**新功能**
+- 语音终端：语音输入命令，语音输出反馈
+- SSH连接持久化：屏幕旋转、切屏不中断
+- L型透明按键布局：方向键 + 查看键
+- 自定义快捷命令：保存后点击直接执行
+- 自定义快捷键：支持多键组合
+
+**优化**
+- 合并 SSHKeyGenerator 到 SSHManager，减少文件数
+- 移除冗余代码和资源
+- 源文件从 46 个精简到 45 个
 
 ## 开发计划
 
@@ -167,7 +175,6 @@ implementation 'org.bouncycastle:bcprov-jdk18on:1.77'
 - [ ] 多服务器同时连接
 - [ ] SFTP 文件传输
 - [ ] 端口转发功能
-- [ ] 深色模式支持
 - [ ] 生物识别锁定
 
 ## 许可证

@@ -4,6 +4,7 @@ import android.util.Log
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.ChannelShell
 import com.jcraft.jsch.JSch
+import com.jcraft.jsch.KeyPair
 import com.jcraft.jsch.Session
 import com.vibecoder.data.ServerConfig
 import kotlinx.coroutines.Dispatchers
@@ -12,8 +13,10 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.util.Base64
 
-class SSHManager {
+class SSHManager private constructor() {
 
     private var session: Session? = null
     private var shellChannel: ChannelShell? = null
@@ -22,6 +25,74 @@ class SSHManager {
 
     companion object {
         private const val TAG = "SSHManager"
+
+        @Volatile
+        private var instance: SSHManager? = null
+
+        fun getInstance(): SSHManager {
+            return instance ?: synchronized(this) {
+                instance ?: SSHManager().also { instance = it }
+            }
+        }
+
+        fun getCurrentInstance(): SSHManager? = instance
+
+        // ==================== SSH密钥生成 ====================
+
+        enum class KeyType(val displayName: String, val jschType: Int, val defaultSize: Int) {
+            ED25519("Ed25519 (推荐)", KeyPair.ED25519, 256),
+            RSA_2048("RSA 2048位", KeyPair.RSA, 2048),
+            RSA_4096("RSA 4096位", KeyPair.RSA, 4096)
+        }
+
+        data class GeneratedKeyPair(
+            val keyType: KeyType,
+            val publicKey: String,
+            val privateKey: String,
+            val fingerprint: String
+        )
+
+        fun generateKeyPair(keyType: KeyType, comment: String = "vibecoder"): GeneratedKeyPair {
+            val jsch = JSch()
+            return try {
+                Log.d(TAG, "开始生成 ${keyType.displayName} 密钥")
+                val kpair = KeyPair.genKeyPair(jsch, keyType.jschType, keyType.defaultSize)
+
+                val privateKeyOut = ByteArrayOutputStream()
+                kpair.writePrivateKey(privateKeyOut)
+                val privateKeyStr = privateKeyOut.toString("UTF-8")
+
+                val publicKeyOut = ByteArrayOutputStream()
+                kpair.writePublicKey(publicKeyOut, comment)
+                val publicKeyStr = publicKeyOut.toString("UTF-8").trim()
+
+                val fingerprint = calculateFingerprint(kpair)
+                kpair.dispose()
+
+                Log.d(TAG, "密钥生成成功: ${keyType.displayName}")
+                GeneratedKeyPair(keyType, publicKeyStr, privateKeyStr, fingerprint)
+            } catch (e: Exception) {
+                Log.e(TAG, "生成 ${keyType.displayName} 密钥失败: ${e.message}", e)
+                if (keyType == KeyType.ED25519) {
+                    Log.w(TAG, "Ed25519 不支持，自动回退到 RSA 2048")
+                    try { generateKeyPair(KeyType.RSA_2048, comment) }
+                    catch (fallbackError: Exception) { throw Exception("无法生成密钥: ${fallbackError.message}") }
+                } else {
+                    throw Exception("生成密钥失败: ${e.message}")
+                }
+            }
+        }
+
+        fun getSupportedKeyTypes(): List<KeyType> = KeyType.entries
+
+        fun validatePrivateKey(privateKey: String): Boolean = privateKey.contains("PRIVATE KEY")
+
+        private fun calculateFingerprint(keyPair: KeyPair): String {
+            val bos = ByteArrayOutputStream()
+            keyPair.writePublicKey(bos, "")
+            val hash = MessageDigest.getInstance("SHA256").digest(bos.toByteArray())
+            return "SHA256:${Base64.getEncoder().withoutPadding().encodeToString(hash)}"
+        }
     }
 
     /**
