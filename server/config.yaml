@@ -1,0 +1,27 @@
+# 语音代理配置
+tmux:
+  session_pattern: "^[0-9]+$"  # 数字会话名
+  poll_interval_ms: 500  # 轮询间隔
+
+state_detection:
+  working_indicators:
+    - "Thinking"
+    - "Reading"
+    - "Analyzing"
+    - "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"  # 进度动画
+  completion_indicators:
+    - "任务"
+    - "完成"
+    - "报告"
+
+content_filter:
+  skip_patterns:
+    - "^```"  # 代码块
+    - "^(●|○)"  # 工具调用
+    - "^\\s*\\{"  # JSON开头
+    - "orbiting|scanning|analyzing"
+  max_length: 5000  # 最大语音播报长度
+
+summarizer:
+  model: "local"  # local 或 api
+  api_endpoint: ""  # API端点（可选）

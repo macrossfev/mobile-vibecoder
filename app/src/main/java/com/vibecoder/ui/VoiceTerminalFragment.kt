@@ -17,6 +17,7 @@ import com.vibecoder.databinding.FragmentVoiceTerminalBinding
 import com.vibecoder.ssh.SSHManager
 import com.vibecoder.voice.VoiceInputManager
 import com.vibecoder.voice.VoiceResult
+import com.vibecoder.voice.VoiceProxyClient
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.util.*
@@ -45,6 +46,11 @@ class VoiceTerminalFragment : Fragment() {
     private var shellJob: Job? = null
     private val outputBuffer = StringBuilder()
     private var voiceJob: Job? = null
+
+    // 语音代理客户端
+    private var voiceProxyClient: VoiceProxyClient? = null
+    private var voiceProxyEnabled = false
+    private var lastSpeechContent = ""
 
     private var voiceOutputEnabled = true
     private var isClaudeWorking = false
@@ -83,6 +89,13 @@ class VoiceTerminalFragment : Fragment() {
         }
 
         voiceOutputEnabled = prefsManager.isVoiceOutputEnabled()
+
+        // 初始化语音代理
+        voiceProxyEnabled = prefsManager.getVoiceProxyEnabled()
+        if (voiceProxyEnabled) {
+            val proxyUrl = prefsManager.getVoiceProxyUrl()
+            voiceProxyClient = VoiceProxyClient(proxyUrl)
+        }
 
         setupVoiceInput()
         setupTextToSpeech()
@@ -275,7 +288,8 @@ class VoiceTerminalFragment : Fragment() {
             }
 
             // 只在非工作状态且有新内容时朗读
-            if (voiceOutputEnabled && text.isNotBlank() && !isClaudeWorking) {
+            // 如果启用了语音代理，跳过本地播报，等待服务端提炼
+            if (voiceOutputEnabled && text.isNotBlank() && !isClaudeWorking && !voiceProxyEnabled) {
                 speakNewContent(text)
             }
         }
@@ -414,6 +428,41 @@ class VoiceTerminalFragment : Fragment() {
             } else {
                 binding.tvStatus.text = "已完成"
                 binding.statusIndicator.setBackgroundResource(R.drawable.status_dot)
+
+                // Claude完成工作，获取语音代理提炼内容
+                if (voiceOutputEnabled && voiceProxyEnabled) {
+                    fetchAndSpeakProxyContent()
+                }
+            }
+        }
+    }
+
+    /**
+     * 从语音代理获取提炼内容并播报
+     */
+    private fun fetchAndSpeakProxyContent() {
+        val client = voiceProxyClient ?: return
+
+        lifecycleScope.launch {
+            try {
+                val result = client.getSpeech()
+                result.fold(
+                    onSuccess = { response ->
+                        val content = response.content
+                        // 只播报新内容（避免重复播报）
+                        if (content.isNotBlank() && content != lastSpeechContent) {
+                            lastSpeechContent = content
+                            // 使用TTS播报服务端提炼的内容
+                            textToSpeech?.speak(content, TextToSpeech.QUEUE_FLUSH, null, null)
+                        }
+                    },
+                    onFailure = { error ->
+                        // 代理不可用时，回退到本地过滤
+                        android.util.Log.w("VoiceTerminal", "Voice proxy unavailable: ${error.message}")
+                    }
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("VoiceTerminal", "Error fetching proxy speech", e)
             }
         }
     }

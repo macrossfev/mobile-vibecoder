@@ -167,6 +167,13 @@ class PreferencesManager(context: Context) {
     fun getCustomShortcut(): String? = prefs.getString(KEY_CUSTOM_SHORTCUT, null)
     fun saveCustomShortcut(shortcut: String) = prefs.edit().putString(KEY_CUSTOM_SHORTCUT, shortcut).apply()
 
+    // 语音代理服务端配置
+    fun getVoiceProxyEnabled(): Boolean = prefs.getBoolean(KEY_VOICE_PROXY_ENABLED, false)
+    fun setVoiceProxyEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_VOICE_PROXY_ENABLED, enabled).apply()
+
+    fun getVoiceProxyUrl(): String = prefs.getString(KEY_VOICE_PROXY_URL, "http://192.168.1.100:8765") ?: "http://192.168.1.100:8765"
+    fun setVoiceProxyUrl(url: String) = prefs.edit().putString(KEY_VOICE_PROXY_URL, url).apply()
+
     companion object {
         private const val PREFS_NAME = "vibecoder_prefs"
         private const val KEY_SERVERS = "servers"
@@ -186,5 +193,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_CUSTOM_SHORTCUTS = "custom_shortcuts"
         private const val KEY_CUSTOM_SHORTCUT = "custom_shortcut"
         private const val KEY_QUICK_COMMAND = "quick_command"
+        private const val KEY_VOICE_PROXY_ENABLED = "voice_proxy_enabled"
+        private const val KEY_VOICE_PROXY_URL = "voice_proxy_url"
     }
 }
