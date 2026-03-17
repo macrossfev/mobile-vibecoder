@@ -48,7 +48,8 @@ class ServerListFragment : Fragment() {
         serverAdapter = ServerAdapter(
             onServerClick = { server -> openTerminal(server) },
             onServerLongClick = { server -> showServerOptions(server) },
-            onMonitorClick = { server -> openMonitor(server) }
+            onMonitorClick = { server -> openMonitor(server) },
+            onVoiceTerminalClick = { server -> openVoiceTerminal(server) }
         )
 
         binding.recyclerView.apply {
@@ -310,6 +311,14 @@ class ServerListFragment : Fragment() {
 
     private fun openMonitor(server: ServerConfig) {
         val fragment = MonitorFragment.newInstance(server)
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
+    }
+
+    private fun openVoiceTerminal(server: ServerConfig) {
+        val fragment = VoiceTerminalFragment.newInstance(server)
         parentFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, fragment)
             .addToBackStack(null)

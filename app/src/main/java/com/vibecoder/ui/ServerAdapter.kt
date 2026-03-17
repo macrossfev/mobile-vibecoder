@@ -12,7 +12,8 @@ import com.vibecoder.databinding.ItemServerBinding
 class ServerAdapter(
     private val onServerClick: (ServerConfig) -> Unit,
     private val onServerLongClick: (ServerConfig) -> Unit,
-    private val onMonitorClick: (ServerConfig) -> Unit
+    private val onMonitorClick: (ServerConfig) -> Unit,
+    private val onVoiceTerminalClick: (ServerConfig) -> Unit
 ) : ListAdapter<ServerConfig, ServerAdapter.ViewHolder>(ServerDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -41,6 +42,11 @@ class ServerAdapter(
             binding.btnMonitor.setOnClickListener {
                 val pos = adapterPosition
                 if (pos != RecyclerView.NO_POSITION) onMonitorClick(getItem(pos))
+            }
+
+            binding.btnVoiceTerminal.setOnClickListener {
+                val pos = adapterPosition
+                if (pos != RecyclerView.NO_POSITION) onVoiceTerminalClick(getItem(pos))
             }
         }
 
